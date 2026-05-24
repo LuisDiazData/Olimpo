@@ -1,0 +1,68 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Test & coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.lcov
+
+# ── Linters & type checkers ───────────────────────────────────────────────────
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+.next/
+.turbo/
+dist/
+.cache/
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Archivos de análisis / trabajo temporal ───────────────────────────────────
+diagnosis_report.txt
+extracted_spec.txt
+migration_analysis_report.txt
+migrations_deep_data.json
+spec_part*.txt
+modelo_datos_propuesta.md
+olimpo_modelo_datos_erd.html
+
+# ── Especificación funcional (documento binario de negocio) ───────────────────
+*.docx
+*.xlsx
+
+# ── Claude Code interno ───────────────────────────────────────────────────────
+.claude/

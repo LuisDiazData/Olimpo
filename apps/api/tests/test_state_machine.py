@@ -1,0 +1,189 @@
+"""
+Tests de la máquina de estados del trámite — Capa 1 (sin DB real).
+
+Cubre:
+  - Completitud y coherencia del dict TRANSICIONES_VALIDAS
+  - Lógica de _enriquecer_tramite (transiciones_disponibles, campos relacionales)
+  - Validaciones del endpoint cambiar-estado: transición inválida, motivos requeridos
+"""
+from unittest.mock import MagicMock
+from uuid import uuid4
+
+import pytest
+
+from models.tramite import EstadoTramite, TRANSICIONES_VALIDAS
+from routers.tramites import _enriquecer_tramite
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _tramite_fake(estado: str) -> dict:
+    return {
+        "id": str(uuid4()),
+        "estado": estado,
+        "analista_id": None,
+        "ramo": None,
+        "activo": True,
+        "folio_ot": None,
+    }
+
+
+def _base_enriquecer(estado: str) -> dict:
+    """Devuelve el dict mínimo necesario para _enriquecer_tramite."""
+    return {
+        "id": str(uuid4()),
+        "estado": estado,
+        "analista_id": None,
+        "ramo": "vida",
+        "activo": True,
+        "folio_ot": None,
+        "agente": None,
+        "usuario": None,
+        "poliza": None,
+        "asegurado": None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# TRANSICIONES_VALIDAS — integridad del grafo
+# ---------------------------------------------------------------------------
+
+class TestTransicionesValidas:
+    def test_todos_los_estados_estan_en_el_dict(self):
+        for estado in EstadoTramite:
+            assert estado in TRANSICIONES_VALIDAS, f"'{estado}' no está en TRANSICIONES_VALIDAS"
+
+    def test_estados_terminales_tienen_lista_vacia(self):
+        assert TRANSICIONES_VALIDAS[EstadoTramite.aprobado] == []
+        assert TRANSICIONES_VALIDAS[EstadoTramite.rechazado] == []
+
+    def test_recibido_solo_transiciona_a_validando(self):
+        destinos = TRANSICIONES_VALIDAS[EstadoTramite.recibido]
+        assert destinos == [EstadoTramite.validando]
+
+    def test_todos_los_destinos_son_estados_validos(self):
+        estados_validos = set(EstadoTramite)
+        for estado, destinos in TRANSICIONES_VALIDAS.items():
+            for destino in destinos:
+                assert destino in estados_validos, f"Destino desconocido: '{destino}' desde '{estado}'"
+
+    def test_no_hay_ciclos_simples_en_terminales(self):
+        for estado_terminal in [EstadoTramite.aprobado, EstadoTramite.rechazado]:
+            assert EstadoTramite.recibido not in TRANSICIONES_VALIDAS[estado_terminal]
+
+    def test_pendiente_documentos_puede_volver_a_validando(self):
+        destinos = TRANSICIONES_VALIDAS[EstadoTramite.pendiente_documentos]
+        assert EstadoTramite.validando in destinos
+
+    def test_activado_puede_llegar_a_aprobado_y_rechazado(self):
+        destinos = TRANSICIONES_VALIDAS[EstadoTramite.activado]
+        assert EstadoTramite.aprobado in destinos
+        assert EstadoTramite.rechazado in destinos
+
+
+# ---------------------------------------------------------------------------
+# _enriquecer_tramite — lógica de transformación
+# ---------------------------------------------------------------------------
+
+class TestEnriquecerTramite:
+    def test_transiciones_desde_recibido(self):
+        data = _enriquecer_tramite(_base_enriquecer("recibido"))
+        assert data["transiciones_disponibles"] == ["validando"]
+
+    def test_transiciones_desde_aprobado_vacio(self):
+        data = _enriquecer_tramite(_base_enriquecer("aprobado"))
+        assert data["transiciones_disponibles"] == []
+
+    def test_transiciones_desde_rechazado_vacio(self):
+        data = _enriquecer_tramite(_base_enriquecer("rechazado"))
+        assert data["transiciones_disponibles"] == []
+
+    def test_transiciones_desde_validando(self):
+        data = _enriquecer_tramite(_base_enriquecer("validando"))
+        assert set(data["transiciones_disponibles"]) == {"pendiente_documentos", "completo"}
+
+    def test_transiciones_desde_en_proceso_gnp(self):
+        data = _enriquecer_tramite(_base_enriquecer("en_proceso_gnp"))
+        assert set(data["transiciones_disponibles"]) == {"activado", "rechazado"}
+
+    def test_estado_invalido_retorna_transiciones_vacias(self):
+        data = _enriquecer_tramite(_base_enriquecer("estado_inventado"))
+        assert data["transiciones_disponibles"] == []
+
+    def test_agente_none_cuando_no_hay_relacion(self):
+        data = _enriquecer_tramite(_base_enriquecer("recibido"))
+        assert data["agente_nombre"] is None
+        assert data["agente_cua"] is None
+
+    def test_analista_nombre_none_cuando_no_hay_relacion(self):
+        data = _enriquecer_tramite(_base_enriquecer("recibido"))
+        assert data["analista_nombre"] is None
+
+    def test_agente_aplanado_correctamente(self):
+        base = _base_enriquecer("recibido")
+        base["agente"] = {"nombre": "Agente Test", "cua": "CUA123"}
+        data = _enriquecer_tramite(base)
+        assert data["agente_nombre"] == "Agente Test"
+        assert data["agente_cua"] == "CUA123"
+        assert "agente" not in data  # La clave original se eliminó (pop)
+
+    def test_poliza_numero_extraido(self):
+        base = _base_enriquecer("recibido")
+        base["poliza"] = {"numero_poliza": "POL-001"}
+        data = _enriquecer_tramite(base)
+        assert data["poliza_numero"] == "POL-001"
+
+
+# ---------------------------------------------------------------------------
+# Endpoint POST /tramites/{id}/cambiar-estado — validaciones sin DB real
+# ---------------------------------------------------------------------------
+
+def test_cambiar_estado_transicion_invalida_retorna_422(client_analista, monkeypatch):
+    """recibido → aprobado es una transición inválida; debe devolver TRANSICION_INVALIDA."""
+    tramite = _tramite_fake("recibido")
+    monkeypatch.setattr("routers.tramites._get_tramite_o_404", lambda db, tid: tramite)
+    monkeypatch.setattr("routers.tramites.get_user_db", lambda token: MagicMock())
+
+    response = client_analista.post(
+        f"/api/v1/tramites/{tramite['id']}/cambiar-estado",
+        json={"estado_nuevo": "aprobado"},
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "TRANSICION_INVALIDA"
+    assert "validando" in detail["transiciones_validas"]
+    assert detail["estado_actual"] == "recibido"
+    assert detail["estado_solicitado"] == "aprobado"
+
+
+def test_cambiar_estado_rechazo_sin_motivo_gnp(client_analista, monkeypatch):
+    """en_proceso_gnp → rechazado sin motivo_rechazo_gnp debe devolver MOTIVO_REQUERIDO."""
+    tramite = _tramite_fake("en_proceso_gnp")
+    monkeypatch.setattr("routers.tramites._get_tramite_o_404", lambda db, tid: tramite)
+    monkeypatch.setattr("routers.tramites.get_user_db", lambda token: MagicMock())
+
+    response = client_analista.post(
+        f"/api/v1/tramites/{tramite['id']}/cambiar-estado",
+        json={"estado_nuevo": "rechazado"},  # sin motivo_rechazo_gnp
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["error_code"] == "MOTIVO_REQUERIDO"
+
+
+def test_cambiar_estado_pendiente_docs_sin_motivo(client_analista, monkeypatch):
+    """validando → pendiente_documentos sin motivo debe devolver MOTIVO_REQUERIDO."""
+    tramite = _tramite_fake("validando")
+    monkeypatch.setattr("routers.tramites._get_tramite_o_404", lambda db, tid: tramite)
+    monkeypatch.setattr("routers.tramites.get_user_db", lambda token: MagicMock())
+
+    response = client_analista.post(
+        f"/api/v1/tramites/{tramite['id']}/cambiar-estado",
+        json={"estado_nuevo": "pendiente_documentos"},  # sin motivo
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["error_code"] == "MOTIVO_REQUERIDO"
