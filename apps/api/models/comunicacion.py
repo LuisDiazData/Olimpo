@@ -11,10 +11,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
 
 class MedioComunicacion(StrEnum):
     whatsapp = "whatsapp"
@@ -25,6 +25,7 @@ class MedioComunicacion(StrEnum):
 # ---------------------------------------------------------------------------
 # Modelos de entrada (requests)
 # ---------------------------------------------------------------------------
+
 
 class ComunicacionCreate(BaseModel):
     """Payload para crear una comunicación."""
@@ -65,6 +66,7 @@ class ComunicacionUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 # Modelos de respuesta
 # ---------------------------------------------------------------------------
+
 
 class ComunicacionResponse(BaseModel):
     """Una comunicación con todos sus datos."""

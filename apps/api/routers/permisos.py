@@ -36,9 +36,7 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/permisos", tags=["permisos"])
 
-_SOLO_DIRECTORES = [
-    Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))
-]
+_SOLO_DIRECTORES = [Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))]
 _DIRECTORES_Y_GERENTES = [
     Depends(
         require_roles(
@@ -53,6 +51,7 @@ _DIRECTORES_Y_GERENTES = [
 # =============================================================================
 # Catálogo de permisos
 # =============================================================================
+
 
 @router.get("", response_model=list[PermisoResponse])
 def listar_permisos(
@@ -85,6 +84,7 @@ def listar_dominios(
 # =============================================================================
 # Permisos por rol
 # =============================================================================
+
 
 @router.get("/rol/{rol}", response_model=list[RolPermisoResponse])
 def listar_permisos_rol(
@@ -168,6 +168,7 @@ def configurar_permiso_rol(
 # Permisos efectivos de un usuario
 # =============================================================================
 
+
 @router.get("/usuarios/{usuario_id}", response_model=PermisosUsuarioResponse)
 def listar_permisos_usuario(
     usuario_id: UUID,
@@ -192,7 +193,9 @@ def listar_permisos_usuario(
     if dominio:
         rows = [r for r in rows if r.get("dominio") == dominio]
 
-    usuario_info = admin.table("usuario").select("rol").eq("id", str(usuario_id)).maybe_single().execute()
+    usuario_info = (
+        admin.table("usuario").select("rol").eq("id", str(usuario_id)).maybe_single().execute()
+    )
     if not usuario_info.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
     rol_usuario = RolUsuario(usuario_info.data["rol"])
@@ -224,7 +227,9 @@ def listar_overrides_usuario(
 
     result = (
         admin.table("usuario_permiso")
-        .select("*, permiso(clave, nombre), otorgado_por_usuario:usuario!usuario_permiso_otorgado_por_fkey(nombre)")
+        .select(
+            "*, permiso(clave, nombre), otorgado_por_usuario:usuario!usuario_permiso_otorgado_por_fkey(nombre)"
+        )
         .eq("usuario_id", str(usuario_id))
         .order("created_at", desc=True)
         .execute()
@@ -356,6 +361,7 @@ def revocar_permiso_usuario(
 # Audit log
 # =============================================================================
 
+
 @router.get(
     "/audit-log",
     response_model=list[PermisoAuditLogEntry],
@@ -405,6 +411,7 @@ def listar_audit_log(
 # Verificación puntual
 # =============================================================================
 
+
 @router.get("/verificar/{permiso_clave}", response_model=dict)
 def verificar_mi_permiso(
     permiso_clave: str,
@@ -424,6 +431,7 @@ def verificar_mi_permiso(
 # Helper privado
 # =============================================================================
 
+
 def _validar_acceso_a_usuario(
     caller: UsuarioToken,
     usuario_id: UUID,
@@ -436,11 +444,7 @@ def _validar_acceso_a_usuario(
         return
     if caller.rol == RolUsuario.gerente and caller.ramo:
         target = (
-            admin.table("usuario")
-            .select("ramo")
-            .eq("id", str(usuario_id))
-            .maybe_single()
-            .execute()
+            admin.table("usuario").select("ramo").eq("id", str(usuario_id)).maybe_single().execute()
         )
         if target.data and target.data.get("ramo") == caller.ramo.value:
             return

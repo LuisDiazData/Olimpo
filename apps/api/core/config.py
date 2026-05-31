@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     @property
     def supabase_jwks(self) -> dict:
         import json
+
         if self.SUPABASE_JWKS_JSON:
             return json.loads(self.SUPABASE_JWKS_JSON)
         return {"keys": []}

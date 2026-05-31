@@ -27,6 +27,7 @@ class TipoTelefono(StrEnum):
 # Teléfonos
 # ---------------------------------------------------------------------------
 
+
 class TelefonoCreate(BaseModel):
     tipo: TipoTelefono = TipoTelefono.celular
     numero: str = Field(min_length=7, max_length=20)
@@ -55,6 +56,7 @@ class TelefonoResponse(BaseModel):
 # Emails del agente
 # ---------------------------------------------------------------------------
 
+
 class AgenteEmailCreate(BaseModel):
     email: EmailStr
     preferente: bool = False
@@ -73,6 +75,7 @@ class AgenteEmailResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Asistentes
 # ---------------------------------------------------------------------------
+
 
 class AsistenteCreate(BaseModel):
     nombre: str = Field(min_length=2, max_length=100)
@@ -103,8 +106,11 @@ class AsistenteResponse(BaseModel):
 # Agente principal
 # ---------------------------------------------------------------------------
 
+
 class AgenteCreate(BaseModel):
-    cua: str = Field(min_length=1, max_length=20, description="Clave Única del Agente asignada por GNP.")
+    cua: str = Field(
+        min_length=1, max_length=20, description="Clave Única del Agente asignada por GNP."
+    )
     nombre: str = Field(min_length=2, max_length=150)
     nombre_comercial: str | None = Field(default=None, max_length=150)
     rfc: str | None = Field(
@@ -147,7 +153,7 @@ class AgenteListItem(BaseModel):
     rfc: str | None
     fecha_afiliacion: date | None
     activo: bool
-    email_preferente: str | None = None    # JOIN en el router para el email principal
+    email_preferente: str | None = None  # JOIN en el router para el email principal
     telefono_preferente: str | None = None  # JOIN en el router para el teléfono principal
 
     model_config = {"from_attributes": True}
@@ -176,6 +182,7 @@ class AgenteResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Bulk import (Excel)
 # ---------------------------------------------------------------------------
+
 
 class AgenteImportRow(BaseModel):
     cua: str = Field(min_length=1, max_length=20)

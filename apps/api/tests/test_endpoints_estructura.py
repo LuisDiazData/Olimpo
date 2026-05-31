@@ -5,15 +5,14 @@ Verifica que los endpoints responden con los códigos correctos y que las respue
 tienen la estructura esperada (campos presentes, tipos correctos).
 Los endpoints que acceden a DB tienen la DB mockeada vía monkeypatch.
 """
+
 from unittest.mock import MagicMock
 from uuid import uuid4
-
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers para mocking
 # ---------------------------------------------------------------------------
+
 
 def _mock_db_vacio():
     """Mock de cliente Supabase que devuelve listas y conteos vacíos."""
@@ -35,6 +34,7 @@ def _mock_db_vacio():
 # Health check — sin auth
 # ---------------------------------------------------------------------------
 
+
 def test_health_retorna_200_sin_auth(client):
     response = client.get("/health")
     assert response.status_code == 200
@@ -43,6 +43,7 @@ def test_health_retorna_200_sin_auth(client):
 # ---------------------------------------------------------------------------
 # Auth requerida — sin token
 # ---------------------------------------------------------------------------
+
 
 def test_tramites_sin_token_retorna_401_o_403(client):
     """HTTPBearer con auto_error=True devuelve 401 o 403 cuando no hay Authorization header."""
@@ -64,6 +65,7 @@ def test_pipeline_schema_sin_token_retorna_401_o_403(client):
 # ---------------------------------------------------------------------------
 # Pipeline schema — sin DB (solo JWT auth + retorno estático)
 # ---------------------------------------------------------------------------
+
 
 def test_pipeline_schema_estados_estructura(client_analista):
     """GET /pipeline/schema/estados no necesita DB; devuelve el grafo estático."""
@@ -97,6 +99,7 @@ def test_pipeline_schema_transiciones_coherentes(client_analista):
 # Pipeline iniciar — validación sin DB
 # ---------------------------------------------------------------------------
 
+
 def test_pipeline_iniciar_agente_invalido_retorna_422(client_analista):
     """El agente_inicio invalido falla ANTES de consultar la DB — no necesita mock."""
     tramite_id = uuid4()
@@ -123,12 +126,20 @@ def test_pipeline_iniciar_agentes_validos_son_1_a_6(client_analista):
     )
     detail = response.json()["detail"]
     validos = detail["valores_validos"]
-    assert sorted(validos) == ["agente_1", "agente_2", "agente_3", "agente_4", "agente_5", "agente_6"]
+    assert sorted(validos) == [
+        "agente_1",
+        "agente_2",
+        "agente_3",
+        "agente_4",
+        "agente_5",
+        "agente_6",
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Tramites — estructura PaginatedResponse (DB mockeada)
 # ---------------------------------------------------------------------------
+
 
 def test_tramites_lista_retorna_estructura_paginada(client_analista, monkeypatch):
     monkeypatch.setattr("routers.tramites.get_user_db", lambda token: _mock_db_vacio())
@@ -160,6 +171,7 @@ def test_tramites_lista_respeta_limit_offset_defaults(client_analista, monkeypat
 # Notificaciones conteo — estructura (DB mockeada)
 # ---------------------------------------------------------------------------
 
+
 def test_notificaciones_conteo_retorna_no_leidas(client_analista, monkeypatch):
     mock_db = MagicMock()
     mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.count = 5
@@ -186,6 +198,7 @@ def test_notificaciones_conteo_retorna_cero_cuando_no_hay(client_analista, monke
 # Coberturas vigentes — estructura (DB mockeada)
 # ---------------------------------------------------------------------------
 
+
 def test_coberturas_vigentes_retorna_lista(client_analista, monkeypatch):
     monkeypatch.setattr("routers.coberturas.get_user_db", lambda token: _mock_db_vacio())
 
@@ -198,6 +211,7 @@ def test_coberturas_vigentes_retorna_lista(client_analista, monkeypatch):
 # ---------------------------------------------------------------------------
 # Actualizar trámite — sin_cambios retorna 422
 # ---------------------------------------------------------------------------
+
 
 def test_patch_tramite_sin_campos_retorna_422(client_analista, monkeypatch):
     """PATCH /tramites/{id} sin ningún campo debe devolver SIN_CAMBIOS."""

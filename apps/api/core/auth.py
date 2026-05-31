@@ -16,12 +16,12 @@ Dos mecanismos de autenticación:
    - El agente opera con el rol y ramo asignados a esa key.
 """
 
+import base64
+import contextlib
 import hashlib
 import json
-import base64
 from uuid import UUID
 
-import httpx
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
@@ -41,6 +41,7 @@ _JWKS_FETCHED_AT = 0.0
 # JWKS helpers (ES256 verification for Supabase v2)
 # =============================================================================
 
+
 def _get_jwks(supabase_url: str, anon_key: str) -> dict:
     """Fetch and cache JWKS from Supabase Auth, fallback to hardcoded keys."""
     global _JWKS_CACHE, _JWKS_FETCHED_AT
@@ -51,6 +52,7 @@ def _get_jwks(supabase_url: str, anon_key: str) -> dict:
 
     try:
         import httpx
+
         resp = httpx.get(
             f"{supabase_url}/auth/v1/.well-known/jwks.json",
             headers={"apikey": anon_key},
@@ -69,17 +71,15 @@ def _get_jwks(supabase_url: str, anon_key: str) -> dict:
 
 def _build_public_key(jwk: dict) -> bytes:
     """Build a raw EC public key from JWK x/y coordinates (P-256 / ES256)."""
-    from cryptography.hazmat.primitives.asymmetric.ec import (
-        EllipticCurvePublicKey,
-        SECP256R1,
-    )
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ec import (
+        SECP256R1,
+        EllipticCurvePublicKey,
+    )
 
     x_bytes = base64url_decode(jwk["x"])
     y_bytes = base64url_decode(jwk["y"])
-    public_key = EllipticCurvePublicKey.from_encoded_point(
-        SECP256R1(), b"\x04" + x_bytes + y_bytes
-    )
+    public_key = EllipticCurvePublicKey.from_encoded_point(SECP256R1(), b"\x04" + x_bytes + y_bytes)
     return public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -88,7 +88,6 @@ def _build_public_key(jwk: dict) -> bytes:
 
 def base64url_decode(data: str) -> bytes:
     """Decode a base64url string (URL-safe base64 without padding)."""
-    import base64
     data = data + "=" * (4 - len(data) % 4)
     return base64.urlsafe_b64decode(data)
 
@@ -118,6 +117,7 @@ def _decode_jwt_es256(token: str, supabase_url: str, anon_key: str) -> dict:
 # MECANISMO 1: JWT de Supabase (usuarios humanos)
 # =============================================================================
 
+
 def _decode_jwt(token: str) -> dict:
     """Decodifica y valida la firma del JWT de Supabase. Lanza HTTPException si es inválido."""
     s = get_settings()
@@ -140,18 +140,18 @@ def _decode_jwt(token: str) -> dict:
             audience="authenticated",
             options={"require": ["sub", "exp", "aud"]},
         )
-    except jwt.ExpiredSignatureError:
+    except jwt.ExpiredSignatureError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sesión expirada. Inicia sesión nuevamente.",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
     except jwt.InvalidTokenError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token inválido: {exc}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
 
 
 def get_current_user(
@@ -176,21 +176,21 @@ def get_current_user(
 
     try:
         rol = RolUsuario(rol_raw)
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Rol desconocido en token: '{rol_raw}'",
-        )
+        ) from exc
 
     ramo: RamoUsuario | None = None
     if ramo_raw is not None:
         try:
             ramo = RamoUsuario(ramo_raw)
-        except ValueError:
+        except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Ramo desconocido en token: '{ramo_raw}'",
-            )
+            ) from exc
 
     return UsuarioToken(
         id=UUID(payload["sub"]),
@@ -208,6 +208,7 @@ def require_roles(*roles: RolUsuario):
     Uso:
         @router.get("/admin", dependencies=[Depends(require_roles(RolUsuario.director_general))])
     """
+
     def _check(usuario: UsuarioToken = Depends(get_current_user)) -> UsuarioToken:
         if usuario.rol not in roles:
             raise HTTPException(
@@ -215,12 +216,14 @@ def require_roles(*roles: RolUsuario):
                 detail=f"Acceso denegado. Roles requeridos: {[r.value for r in roles]}",
             )
         return usuario
+
     return _check
 
 
 # =============================================================================
 # MECANISMO 2: API key para agentes externos (MCP, n8n, integraciones)
 # =============================================================================
+
 
 def get_agent_token(
     api_key: str | None = Depends(_api_key_header),
@@ -247,6 +250,7 @@ def get_agent_token(
 
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     from core.database import get_admin_db
+
     db = get_admin_db()
 
     result = db.rpc("validar_agent_api_key", {"p_key_hash": key_hash}).execute()
@@ -265,21 +269,19 @@ def get_agent_token(
 
     try:
         rol = RolUsuario(key_data["rol"])
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error_code": "ROL_INVALIDO",
                 "mensaje": f"La API key tiene un rol inválido: '{key_data['rol']}'",
             },
-        )
+        ) from exc
 
     ramo: RamoUsuario | None = None
     if key_data.get("ramo"):
-        try:
+        with contextlib.suppress(ValueError):
             ramo = RamoUsuario(key_data["ramo"])
-        except ValueError:
-            pass
 
     return UsuarioToken(
         id=UUID(key_data["id"]),
@@ -294,6 +296,7 @@ def get_agent_token(
 # PERMISOS GRANULARES
 # =============================================================================
 
+
 def require_permiso(clave: str):
     """
     Dependencia de fábrica que valida un permiso granular del usuario autenticado.
@@ -306,8 +309,10 @@ def require_permiso(clave: str):
     El permiso se evalúa en el cliente admin (service_role) para evitar que RLS
     sobre las tablas de permisos bloquee la verificación.
     """
+
     def _check(caller: UsuarioToken = Depends(get_current_user)) -> UsuarioToken:
         from core.database import get_admin_db
+
         admin = get_admin_db()
         result = admin.rpc(
             "tiene_permiso",
@@ -323,6 +328,7 @@ def require_permiso(clave: str):
                 },
             )
         return caller
+
     return _check
 
 

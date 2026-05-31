@@ -5,8 +5,8 @@ Arranque:
     uvicorn main:app --reload --port 8000
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import logfire
 import structlog
@@ -96,7 +96,7 @@ def create_app() -> FastAPI:
     # Routers
     # -------------------------------------------------------------------------
     app.include_router(health.router)
-    app.include_router(gmail_webhook.router)   # sin prefix: /webhook/gmail (URL fija para Pub/Sub)
+    app.include_router(gmail_webhook.router)  # sin prefix: /webhook/gmail (URL fija para Pub/Sub)
     app.include_router(usuarios.router, prefix="/api/v1")
     app.include_router(agentes.router, prefix="/api/v1")
     app.include_router(asignaciones.router, prefix="/api/v1")

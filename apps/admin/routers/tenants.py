@@ -35,6 +35,7 @@ router = APIRouter(
 # MODELOS
 # =============================================================================
 
+
 class LicenciaCreate(BaseModel):
     tipo_plan: Literal["basico", "profesional", "enterprise"] = "basico"
     fecha_inicio_licencia: date | None = None
@@ -56,7 +57,9 @@ class TenantCreate(BaseModel):
         description="Ej: alvarez.olimpo.mx",
     )
     supabase_url: str = Field(description="Ej: https://abc123.supabase.co")
-    service_role_key: str = Field(min_length=100, description="service_role_key en texto plano. Se almacena cifrada.")
+    service_role_key: str = Field(
+        min_length=100, description="service_role_key en texto plano. Se almacena cifrada."
+    )
     licencia: LicenciaCreate = Field(default_factory=LicenciaCreate)
 
     @field_validator("supabase_url")
@@ -104,11 +107,16 @@ class TenantListItem(BaseModel):
 # HELPERS
 # =============================================================================
 
+
 def _get_tenant_or_404(tenant_id: UUID):
     db = get_admin_db()
-    result = db.table("tenant").select(
-        "id, tipo_plan, fecha_inicio_licencia, fecha_vencimiento_licencia, estado_licencia"
-    ).eq("id", str(tenant_id)).single().execute()
+    result = (
+        db.table("tenant")
+        .select("id, tipo_plan, fecha_inicio_licencia, fecha_vencimiento_licencia, estado_licencia")
+        .eq("id", str(tenant_id))
+        .single()
+        .execute()
+    )
 
     if not result.data:
         raise HTTPException(
@@ -147,32 +155,38 @@ async def _validar_conectividad_tenant(supabase_url: str, service_role_key: str)
                     detail={
                         "error_code": "SUPABASE_TENANT_NO_DISPONIBLE",
                         "mensaje": "El proyecto Supabase del tenant no está respondiendo. "
-                                   "Verifica que el proyecto exista y esté activo.",
+                        "Verifica que el proyecto exista y esté activo.",
                     },
                 )
-    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "error_code": "SUPABASE_TENANT_NO_DISPONIBLE",
                 "mensaje": "No se pudo conectar al proyecto Supabase del tenant. "
-                           "Verifica que la URL sea correcta y el proyecto esté activo.",
+                "Verifica que la URL sea correcta y el proyecto esté activo.",
             },
-        )
+        ) from exc
 
 
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
 
+
 @router.get("", response_model=list[TenantListItem])
 def listar_tenants():
     """Lista todos los tenants registrados."""
     db = get_admin_db()
-    result = db.table("tenant").select(
-        "id, nombre, subdominio, activo, tipo_plan, estado_licencia, "
-        "fecha_vencimiento_licencia, usuario_maestro_email, created_at"
-    ).order("created_at", desc=True).execute()
+    result = (
+        db.table("tenant")
+        .select(
+            "id, nombre, subdominio, activo, tipo_plan, estado_licencia, "
+            "fecha_vencimiento_licencia, usuario_maestro_email, created_at"
+        )
+        .order("created_at", desc=True)
+        .execute()
+    )
     return result.data
 
 
@@ -197,16 +211,22 @@ async def crear_tenant(body: TenantCreate):
         fecha_venc = date.today() + timedelta(days=30)
 
     try:
-        result = db.table("tenant").insert({
-            "nombre": body.nombre,
-            "subdominio": body.subdominio,
-            "supabase_url": body.supabase_url,
-            "service_role_key_enc": key_enc,
-            "tipo_plan": lic.tipo_plan,
-            "fecha_inicio_licencia": fecha_inicio.isoformat(),
-            "fecha_vencimiento_licencia": fecha_venc.isoformat() if fecha_venc else None,
-            "estado_licencia": lic.estado_licencia,
-        }).execute()
+        result = (
+            db.table("tenant")
+            .insert(
+                {
+                    "nombre": body.nombre,
+                    "subdominio": body.subdominio,
+                    "supabase_url": body.supabase_url,
+                    "service_role_key_enc": key_enc,
+                    "tipo_plan": lic.tipo_plan,
+                    "fecha_inicio_licencia": fecha_inicio.isoformat(),
+                    "fecha_vencimiento_licencia": fecha_venc.isoformat() if fecha_venc else None,
+                    "estado_licencia": lic.estado_licencia,
+                }
+            )
+            .execute()
+        )
     except Exception as exc:
         msg = str(exc)
         if "uq_tenant_subdominio" in msg:
@@ -216,12 +236,12 @@ async def crear_tenant(body: TenantCreate):
                     "error_code": "SUBDOMINIO_DUPLICADO",
                     "mensaje": f"Ya existe un tenant con el subdominio '{body.subdominio}'.",
                 },
-            )
+            ) from exc
         log.error("error_crear_tenant", error=msg)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error_code": "ERROR_DB", "mensaje": "Error al registrar el tenant."},
-        )
+        ) from exc
 
     log.info("tenant_creado", subdominio=body.subdominio, nombre=body.nombre)
     return result.data[0]
@@ -231,11 +251,17 @@ async def crear_tenant(body: TenantCreate):
 def obtener_tenant(tenant_id: UUID):
     """Detalle completo de un tenant (sin exponer la service_role_key)."""
     db = get_admin_db()
-    result = db.table("tenant").select(
-        "id, nombre, subdominio, supabase_url, activo, "
-        "tipo_plan, fecha_inicio_licencia, fecha_vencimiento_licencia, estado_licencia, "
-        "usuario_maestro_id, usuario_maestro_email, created_at, updated_at"
-    ).eq("id", str(tenant_id)).single().execute()
+    result = (
+        db.table("tenant")
+        .select(
+            "id, nombre, subdominio, supabase_url, activo, "
+            "tipo_plan, fecha_inicio_licencia, fecha_vencimiento_licencia, estado_licencia, "
+            "usuario_maestro_id, usuario_maestro_email, created_at, updated_at"
+        )
+        .eq("id", str(tenant_id))
+        .single()
+        .execute()
+    )
 
     if not result.data:
         raise HTTPException(

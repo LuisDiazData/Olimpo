@@ -61,7 +61,8 @@ def setup_observability() -> None:
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
-            structlog.processors.JSONRenderer() if s.is_production
+            structlog.processors.JSONRenderer()
+            if s.is_production
             else structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),

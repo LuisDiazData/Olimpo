@@ -31,12 +31,12 @@ def descifrar_key(ciphertext: str) -> str:
     """
     try:
         return _fernet().decrypt(ciphertext.encode()).decode()
-    except (InvalidToken, Exception):
+    except (InvalidToken, Exception) as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "error_code": "DESCIFRADO_FALLIDO",
                 "mensaje": "No se pudo descifrar la credencial del tenant. "
-                           "Verifica que ADMIN_ENCRYPTION_KEY es correcta.",
+                "Verifica que ADMIN_ENCRYPTION_KEY es correcta.",
             },
-        )
+        ) from exc

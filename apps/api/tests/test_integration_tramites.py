@@ -8,9 +8,10 @@ Estos tests crean datos reales en la DB y los limpian al finalizar.
 Usan el cliente admin (service_role) para setup/teardown, y el cliente autenticado
 para verificar el comportamiento de los endpoints con RLS activo.
 """
-import pytest
+
 from uuid import uuid4
 
+import pytest
 
 pytestmark = pytest.mark.integration
 
@@ -19,10 +20,12 @@ pytestmark = pytest.mark.integration
 # Fixtures de integración
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def admin_db():
     """Cliente Supabase con service_role para setup/teardown."""
     from core.database import get_admin_db
+
     return get_admin_db()
 
 
@@ -30,13 +33,20 @@ def admin_db():
 def tramite_recibido(admin_db, director_token):
     """Crea un trámite en estado 'recibido' y lo elimina al finalizar el test."""
     # Insertar con admin para bypasear RLS
-    result = admin_db.table("tramite").insert({
-        "tipo_tramite": "alta",
-        "titulo": "Test trámite integración",
-        "descripcion": "Creado por suite de integración",
-        "canal_origen": "manual",
-        "prioridad": "normal",
-    }).select("id, folio, estado").execute()
+    result = (
+        admin_db.table("tramite")
+        .insert(
+            {
+                "tipo_tramite": "alta",
+                "titulo": "Test trámite integración",
+                "descripcion": "Creado por suite de integración",
+                "canal_origen": "manual",
+                "prioridad": "normal",
+            }
+        )
+        .select("id, folio, estado")
+        .execute()
+    )
 
     tramite_id = result.data[0]["id"]
     yield result.data[0]
@@ -49,6 +59,7 @@ def tramite_recibido(admin_db, director_token):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_crear_tramite_retorna_201_con_folio(client_director):
     """POST /tramites crea un trámite con folio generado por trigger DB."""
@@ -70,6 +81,7 @@ def test_crear_tramite_retorna_201_con_folio(client_director):
 
     # Limpieza
     from core.database import get_admin_db
+
     db = get_admin_db()
     tramite_id = data["id"]
     db.table("tramite_evento").delete().eq("tramite_id", tramite_id).execute()

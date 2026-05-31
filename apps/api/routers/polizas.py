@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router de pÃ³lizas y asegurados.
 
 PÃ³lizas:
@@ -43,14 +43,13 @@ from models.usuario import RolUsuario, UsuarioToken
 log = structlog.get_logger(__name__)
 router = APIRouter(tags=["polizas"])
 
-_SOLO_DIRECTORES = [
-    Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))
-]
+_SOLO_DIRECTORES = [Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))]
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_poliza_o_404(db, poliza_id: UUID) -> dict:
     result = (
@@ -64,6 +63,7 @@ def _get_poliza_o_404(db, poliza_id: UUID) -> dict:
 # ===========================================================================
 # ASEGURADOS
 # ===========================================================================
+
 
 @router.get("/asegurados", response_model=list[AseguradoListItem])
 async def buscar_asegurados(
@@ -98,19 +98,22 @@ async def crear_asegurado(
 
     try:
         result = (
-            db.table("asegurado")
-            .insert(body.model_dump(exclude_none=True))
-            .select("*")
-            .execute()
+            db.table("asegurado").insert(body.model_dump(exclude_none=True)).select("*").execute()
         )
         if result.data:
             result.data = result.data[0]
     except Exception as exc:
         msg = str(exc)
         if "uq_asegurado_rfc" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un asegurado con RFC '{body.rfc}'.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Ya existe un asegurado con RFC '{body.rfc}'.",
+            ) from exc
         if "uq_asegurado_curp" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un asegurado con CURP '{body.curp}'.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Ya existe un asegurado con CURP '{body.curp}'.",
+            ) from exc
         raise
 
     return AseguradoResponse.model_validate(result.data)
@@ -136,20 +139,25 @@ async def buscar_o_crear_asegurado(
     result = admin.rpc(
         "buscar_o_crear_asegurado",
         {
-            "p_nombre":            body.nombre,
-            "p_rfc":               body.rfc,
-            "p_curp":              body.curp,
-            "p_tipo":              body.tipo.value if body.tipo else None,
-            "p_fecha_nacimiento":  body.fecha_nacimiento.isoformat() if body.fecha_nacimiento else None,
+            "p_nombre": body.nombre,
+            "p_rfc": body.rfc,
+            "p_curp": body.curp,
+            "p_tipo": body.tipo.value if body.tipo else None,
+            "p_fecha_nacimiento": body.fecha_nacimiento.isoformat()
+            if body.fecha_nacimiento
+            else None,
             "p_datos_adicionales": body.datos_adicionales or {},
-            "p_similitud_minima":  body.similitud_minima,
+            "p_similitud_minima": body.similitud_minima,
         },
     ).execute()
 
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error_code": "ERROR_DEDUP", "mensaje": "La función de deduplicación no retornó resultado."},
+            detail={
+                "error_code": "ERROR_DEDUP",
+                "mensaje": "La función de deduplicación no retornó resultado.",
+            },
         )
 
     data: dict = result.data if isinstance(result.data, dict) else result.data[0]
@@ -164,7 +172,9 @@ async def buscar_o_crear_asegurado(
     asegurado_detail: AseguradoResponse | None = None
     if asegurado_id:
         db = get_user_db(usuario.access_token)
-        aseg = db.table("asegurado").select("*").eq("id", str(asegurado_id)).maybe_single().execute()
+        aseg = (
+            db.table("asegurado").select("*").eq("id", str(asegurado_id)).maybe_single().execute()
+        )
         if aseg.data:
             asegurado_detail = AseguradoResponse.model_validate(aseg.data)
 
@@ -194,7 +204,9 @@ async def obtener_asegurado(
     db = get_user_db(usuario.access_token)
     result = db.table("asegurado").select("*").eq("id", str(asegurado_id)).maybe_single().execute()
     if not result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asegurado no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Asegurado no encontrado."
+        )
     return AseguradoResponse.model_validate(result.data)
 
 
@@ -206,36 +218,41 @@ async def actualizar_asegurado(
 ) -> AseguradoResponse:
     cambios = body.model_dump(exclude_none=True)
     if not cambios:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se enviaron campos.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se enviaron campos."
+        )
 
     db = get_user_db(usuario.access_token)
 
     try:
         result = (
-            db.table("asegurado")
-            .update(cambios)
-            .eq("id", str(asegurado_id))
-            .select("*")
-            .execute()
+            db.table("asegurado").update(cambios).eq("id", str(asegurado_id)).select("*").execute()
         )
         if result.data:
             result.data = result.data[0]
     except Exception as exc:
         msg = str(exc)
         if "uq_asegurado_rfc" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="RFC ya registrado.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="RFC ya registrado."
+            ) from exc
         if "uq_asegurado_curp" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CURP ya registrado.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="CURP ya registrado."
+            ) from exc
         raise
 
     if not result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asegurado no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Asegurado no encontrado."
+        )
     return AseguradoResponse.model_validate(result.data)
 
 
 # ===========================================================================
 # PÃ“LIZAS
 # ===========================================================================
+
 
 @router.get("/polizas", response_model=list[PolizaListItem])
 async def listar_polizas(
@@ -311,7 +328,7 @@ async def crear_poliza(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Ya existe una pÃ³liza con nÃºmero '{body.numero_poliza}'.",
-            )
+            ) from exc
         raise
 
     return _armar_poliza_response(result.data)
@@ -351,7 +368,9 @@ async def actualizar_poliza(
 ) -> PolizaResponse:
     cambios = body.model_dump(exclude_none=True)
     if not cambios:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se enviaron campos.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se enviaron campos."
+        )
 
     db = get_user_db(usuario.access_token)
     _get_poliza_o_404(db, poliza_id)
@@ -368,6 +387,7 @@ async def actualizar_poliza(
 # ---------------------------------------------------------------------------
 # Asegurados vinculados a una pÃ³liza
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/polizas/{poliza_id}/asegurados",
@@ -398,7 +418,9 @@ async def vincular_asegurado(
         result = (
             db.table("poliza_asegurado")
             .insert(payload)
-            .select("id, poliza_id, asegurado_id, rol, parentesco, porcentaje, datos_adicionales, created_at")
+            .select(
+                "id, poliza_id, asegurado_id, rol, parentesco, porcentaje, datos_adicionales, created_at"
+            )
             .execute()
         )
         if result.data:
@@ -406,9 +428,14 @@ async def vincular_asegurado(
     except Exception as exc:
         msg = str(exc)
         if "uq_poliza_titular" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta pÃ³liza ya tiene un titular.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Esta pÃ³liza ya tiene un titular."
+            ) from exc
         if "uq_poliza_asegurado" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este asegurado ya estÃ¡ vinculado a esta pÃ³liza.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este asegurado ya estÃ¡ vinculado a esta pÃ³liza.",
+            ) from exc
         raise
 
     data = result.data
@@ -428,13 +455,16 @@ async def desvincular_asegurado(
 ) -> None:
     """Solo directores pueden desvincular asegurados (para corregir errores del agente IA)."""
     db = get_user_db(usuario.access_token)
-    db.table("poliza_asegurado").delete().eq("id", str(vinculo_id)).eq("poliza_id", str(poliza_id)).execute()
+    db.table("poliza_asegurado").delete().eq("id", str(vinculo_id)).eq(
+        "poliza_id", str(poliza_id)
+    ).execute()
     log.info("asegurado_desvinculado", vinculo_id=str(vinculo_id), por=str(usuario.id))
 
 
 # ---------------------------------------------------------------------------
 # Helper de construcciÃ³n de PolizaResponse
 # ---------------------------------------------------------------------------
+
 
 def _armar_poliza_response(data: dict) -> PolizaResponse:
     agente = data.pop("agente", None) or {}

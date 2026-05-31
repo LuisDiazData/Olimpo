@@ -54,6 +54,7 @@ def get_user_db(access_token: str) -> Client:
 # DEPENDENCIAS DE FASTAPI (Inyectables en Routers)
 # -----------------------------------------------------------------------------
 
+
 def get_db(usuario: UsuarioToken = Depends(get_current_user)) -> Client:
     """
     Dependencia de FastAPI para obtener el cliente de base de datos del usuario autenticado.
@@ -68,4 +69,3 @@ def get_admin_db_dep() -> Client:
     Se usa para operaciones del sistema que requieren bypass de RLS.
     """
     return get_admin_db()
-

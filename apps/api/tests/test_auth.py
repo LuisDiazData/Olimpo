@@ -6,6 +6,7 @@ Cubre:
   - require_roles: rol correcto, rol incorrecto, múltiples roles
   - get_current_user_or_agent: sin credenciales, con JWT Bearer
 """
+
 import time
 from uuid import UUID, uuid4
 
@@ -19,10 +20,10 @@ from core.config import get_settings
 from models.usuario import RamoUsuario, RolUsuario, UsuarioToken
 from tests.conftest import make_test_jwt
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _creds(token: str) -> HTTPAuthorizationCredentials:
     return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
@@ -46,6 +47,7 @@ def _make_jwt(extra_metadata: dict, expired: bool = False) -> str:
 # ---------------------------------------------------------------------------
 # get_current_user
 # ---------------------------------------------------------------------------
+
 
 class TestGetCurrentUser:
     def test_jwt_valido_analista_retorna_usuario_correcto(self):
@@ -123,11 +125,15 @@ class TestGetCurrentUser:
 # require_roles
 # ---------------------------------------------------------------------------
 
+
 class TestRequireRoles:
     def _usuario(self, rol: RolUsuario, ramo: RamoUsuario | None = None) -> UsuarioToken:
         return UsuarioToken(
-            id=uuid4(), email="x@olimpo.test",
-            rol=rol, ramo=ramo, access_token="fake-token",
+            id=uuid4(),
+            email="x@olimpo.test",
+            rol=rol,
+            ramo=ramo,
+            access_token="fake-token",
         )
 
     def test_rol_correcto_pasa_sin_excepcion(self):
@@ -153,7 +159,9 @@ class TestRequireRoles:
             assert result.rol == rol
 
     def test_analista_no_pasa_restriccion_de_gerentes(self):
-        checker = require_roles(RolUsuario.director_general, RolUsuario.director_ops, RolUsuario.gerente)
+        checker = require_roles(
+            RolUsuario.director_general, RolUsuario.director_ops, RolUsuario.gerente
+        )
         user = self._usuario(RolUsuario.analista, RamoUsuario.autos)
         with pytest.raises(HTTPException) as exc:
             checker(usuario=user)
@@ -163,6 +171,7 @@ class TestRequireRoles:
 # ---------------------------------------------------------------------------
 # get_current_user_or_agent
 # ---------------------------------------------------------------------------
+
 
 class TestGetCurrentUserOrAgent:
     def test_sin_credenciales_lanza_401_con_error_code(self):

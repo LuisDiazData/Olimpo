@@ -1,4 +1,4 @@
-﻿"""
+"""
 Endpoints de sistema: salud del servicio y perfil del usuario autenticado.
 
 GET /health  â€” sin autenticaciÃ³n. Railway lo usa como health check.
@@ -97,4 +97,3 @@ def update_me(
 
     log.info("perfil_actualizado", usuario_id=str(usuario.id), campos=list(cambios.keys()))
     return UsuarioResponse.model_validate(result.data)
-
