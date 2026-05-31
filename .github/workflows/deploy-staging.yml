@@ -1,8 +1,9 @@
 name: Deploy — Staging
 
 on:
-  push:
-    branches: [develop]
+  workflow_dispatch:   # manual hasta que los secrets de Railway/Supabase/Vercel estén configurados
+  # push:
+  #   branches: [develop]
 
 # Solo un despliegue a staging a la vez; cancela el anterior si hay uno en cola
 concurrency:
