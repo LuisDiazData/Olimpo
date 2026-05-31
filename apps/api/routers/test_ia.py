@@ -6,13 +6,11 @@ generación de embeddings y procesamiento de OCR.
 Excluido en producción o protegido.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
-from core.auth import get_current_user_or_agent, require_roles
-from core.config import get_settings
-from core.llm_client import get_ia_client, IAClientError
-from models.usuario import RolUsuario, UsuarioToken
+from core.auth import get_current_user_or_agent
+from core.llm_client import IAClientError, get_ia_client
 
 router = APIRouter(prefix="/test/ia", tags=["diagnostico-ia"])
 

@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     @field_validator("ADMIN_ENCRYPTION_KEY")
     @classmethod
     def validar_fernet_key(cls, v: str) -> str:
-        from cryptography.fernet import Fernet, InvalidToken
+        from cryptography.fernet import Fernet
         try:
             # Verificar que la clave es válida intentando crear un Fernet con ella
             Fernet(v.encode())

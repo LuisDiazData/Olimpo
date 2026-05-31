@@ -8,9 +8,9 @@ Estos tests crean datos reales en la DB y los limpian al finalizar.
 Usan el cliente admin (service_role) para setup/teardown, y el cliente autenticado
 para verificar el comportamiento de los endpoints con RLS activo.
 """
-import pytest
 from uuid import uuid4
 
+import pytest
 
 pytestmark = pytest.mark.integration
 

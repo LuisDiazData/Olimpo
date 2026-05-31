@@ -16,12 +16,12 @@ Dos mecanismos de autenticación:
    - El agente opera con el rol y ramo asignados a esa key.
 """
 
+import base64
+import contextlib
 import hashlib
 import json
-import base64
 from uuid import UUID
 
-import httpx
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
@@ -69,11 +69,11 @@ def _get_jwks(supabase_url: str, anon_key: str) -> dict:
 
 def _build_public_key(jwk: dict) -> bytes:
     """Build a raw EC public key from JWK x/y coordinates (P-256 / ES256)."""
-    from cryptography.hazmat.primitives.asymmetric.ec import (
-        EllipticCurvePublicKey,
-        SECP256R1,
-    )
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ec import (
+        SECP256R1,
+        EllipticCurvePublicKey,
+    )
 
     x_bytes = base64url_decode(jwk["x"])
     y_bytes = base64url_decode(jwk["y"])
@@ -88,7 +88,6 @@ def _build_public_key(jwk: dict) -> bytes:
 
 def base64url_decode(data: str) -> bytes:
     """Decode a base64url string (URL-safe base64 without padding)."""
-    import base64
     data = data + "=" * (4 - len(data) % 4)
     return base64.urlsafe_b64decode(data)
 
@@ -276,10 +275,8 @@ def get_agent_token(
 
     ramo: RamoUsuario | None = None
     if key_data.get("ramo"):
-        try:
+        with contextlib.suppress(ValueError):
             ramo = RamoUsuario(key_data["ramo"])
-        except ValueError:
-            pass
 
     return UsuarioToken(
         id=UUID(key_data["id"]),

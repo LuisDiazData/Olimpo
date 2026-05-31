@@ -19,14 +19,12 @@ Seguridad:
 """
 
 import base64
-import hashlib
 import hmac
 import json
-import logging
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 from pydantic import BaseModel
 
 from core.config import get_settings

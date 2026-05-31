@@ -8,14 +8,14 @@ Uso:
         return PaginatedResponse.build(items=items, total=total, offset=offset, limit=limit)
 """
 
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
 
-class PaginatedResponse(BaseModel, Generic[T]):
+class PaginatedResponse[T](BaseModel):
     """
     Envuelve cualquier lista con metadatos de paginación.
     Necesario para que agentes MCP sepan si existen más registros.

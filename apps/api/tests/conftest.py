@@ -30,7 +30,6 @@ from fastapi.testclient import TestClient
 from core.config import get_settings
 from main import app
 
-
 # ---------------------------------------------------------------------------
 # Helpers para generar JWTs de test
 # ---------------------------------------------------------------------------

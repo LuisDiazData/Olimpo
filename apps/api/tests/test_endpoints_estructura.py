@@ -8,9 +8,6 @@ Los endpoints que acceden a DB tienen la DB mockeada vía monkeypatch.
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # Helpers para mocking
 # ---------------------------------------------------------------------------

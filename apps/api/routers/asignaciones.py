@@ -8,7 +8,6 @@ GET    /asignaciones/resolver            â€” analista efectivo hoy (aplica 
 """
 
 from datetime import date
-from typing import Any
 from uuid import UUID
 
 import structlog
@@ -18,8 +17,8 @@ from core.auth import get_current_user, get_current_user_or_agent, require_roles
 from core.database import get_user_db
 from models.asignacion import (
     AsignacionCreate,
-    AsignacionUpdate,
     AsignacionResponse,
+    AsignacionUpdate,
     BulkAsignacionCreate,
     BulkAsignacionResult,
     ResolverAsignacionResponse,

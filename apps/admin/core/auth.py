@@ -6,7 +6,7 @@ El panel Admin también está protegido por IP allowlist en el middleware de mai
 La doble protección (IP + API key) compensa la simplicidad del esquema.
 """
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
 from core.config import get_settings

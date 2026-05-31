@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from core.auth import get_current_user, require_permiso, require_roles
-from core.database import get_admin_db_dep, get_db, get_user_db
+from core.database import get_admin_db_dep, get_user_db
 from models.tramite import PrioridadTramite, TipoTramite
 from models.usuario import RamoUsuario, RolUsuario, UsuarioToken
 

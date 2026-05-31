@@ -7,8 +7,8 @@ Arranque:
 Acceso exclusivo: IP allowlist + X-Admin-API-Key en cada request.
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import structlog
 from fastapi import FastAPI, Request, status

@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 
 from models.usuario import RolUsuario
 
-
 # ---------------------------------------------------------------------------
 # Catálogo de permisos
 # ---------------------------------------------------------------------------

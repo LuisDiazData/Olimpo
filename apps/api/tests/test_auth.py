@@ -19,7 +19,6 @@ from core.config import get_settings
 from models.usuario import RamoUsuario, RolUsuario, UsuarioToken
 from tests.conftest import make_test_jwt
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

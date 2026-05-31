@@ -3,8 +3,8 @@ Modelos Pydantic para pólizas y asegurados.
 """
 
 from datetime import date, datetime
-from enum import StrEnum
 from decimal import Decimal
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator

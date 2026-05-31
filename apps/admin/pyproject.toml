@@ -36,7 +36,11 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501"]
+ignore = [
+    "E501",
+    "B008",  # Depends/Query/File en defaults — patrón estándar de FastAPI
+    "B904",  # raise sin `from` en except — conversión intencional a HTTPException
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

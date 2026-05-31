@@ -18,9 +18,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from core.auth import get_current_user, require_permiso, require_roles
 from core.database import get_admin_db, get_user_db
-from models.pagination import PaginatedResponse
 from models.correo import CorreoTramiteItem, DocumentoListItem
+from models.pagination import PaginatedResponse
 from models.tramite import (
+    TRANSICIONES_VALIDAS,
     AgregarNotaBody,
     AsignarAnalistaBody,
     CambiarEstadoBody,
@@ -29,7 +30,6 @@ from models.tramite import (
     EventoResponse,
     ReasignacionMasivaBody,
     TipoEventoTramite,
-    TRANSICIONES_VALIDAS,
     TramiteCreate,
     TramiteListItem,
     TramiteResponse,
@@ -868,7 +868,7 @@ async def listar_contactos_tramite(
             rol="analista",
         ))
 
-    if gerente := (t.get("gerente") or {}):
+    if gerente := (t.get("gerente") or {}):  # noqa: SIM102
         # Evitar duplicado si gerente == analista (caso de analistas-gerentes)
         if str(gerente.get("id")) not in {c.id for c in contactos}:
             contactos.append(ContactoTramiteResponse(

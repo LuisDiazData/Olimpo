@@ -17,7 +17,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase import AuthApiError, Client
 
-from core.auth import get_current_user, require_permiso, require_roles
+from core.auth import require_permiso, require_roles
 from core.database import get_admin_db_dep, get_db
 from models.usuario import (
     RolUsuario,
@@ -118,12 +118,11 @@ def crear_usuario(
             ),
         )
 
-    if caller.rol == RolUsuario.gerente:
-        if body.ramo != caller.ramo:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Solo puedes crear analistas de tu ramo '{caller.ramo}'.",
-            )
+    if caller.rol == RolUsuario.gerente and body.ramo != caller.ramo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Solo puedes crear analistas de tu ramo '{caller.ramo}'.",
+        )
 
     user_metadata = {"nombre": body.nombre}
     if body.telefono:

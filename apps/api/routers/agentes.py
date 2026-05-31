@@ -19,20 +19,21 @@ POST   /agentes/{id}/asistentes             â€” agregar asistente
 PATCH  /agentes/{id}/asistentes/{asist_id}  â€” actualizar asistente
 """
 
-from uuid import UUID
+import contextlib
 from datetime import date
 from io import BytesIO
+from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from supabase import Client
 
 from core.auth import get_current_user, require_roles
-from core.database import get_db, get_admin_db
+from core.database import get_admin_db, get_db
 from models.agente import (
     AgenteCreate,
     AgenteEmailCreate,
@@ -44,9 +45,8 @@ from models.agente import (
     AsistenteCreate,
     AsistenteResponse,
     AsistenteUpdate,
-    ImportPreviewItem,
-    ImportResultItem,
     ImportResponse,
+    ImportResultItem,
     TelefonoCreate,
     TelefonoResponse,
     TipoTelefono,
@@ -635,25 +635,21 @@ async def importar_agentes(
             agente_id: str = created["id"]
 
             if row_data.email:
-                try:
+                with contextlib.suppress(Exception):
                     admin_db.table("agente_email").insert({
                         "agente_id": agente_id,
                         "email": row_data.email,
                         "preferente": True,
                     }).execute()
-                except Exception:
-                    pass
 
             if row_data.telefono:
-                try:
+                with contextlib.suppress(Exception):
                     admin_db.table("agente_telefono").insert({
                         "agente_id": agente_id,
                         "numero": row_data.telefono,
                         "tipo": row_data.tipo_telefono or TipoTelefono.celular.value,
                         "preferente": True,
                     }).execute()
-                except Exception:
-                    pass
 
             exitosos += 1
             results.append(ImportResultItem(row=idx, cua=cua, success=True, agente_id=agente_id))

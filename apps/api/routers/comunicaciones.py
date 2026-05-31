@@ -23,7 +23,6 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import ValidationError
 
 from core.auth import get_current_user
 from core.database import get_db

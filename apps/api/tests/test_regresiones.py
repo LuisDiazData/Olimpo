@@ -6,9 +6,6 @@ no vuelvan a aparecer. Cada test está vinculado a un fix específico.
 """
 import inspect
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # Regresión 1: Importación de todos los routers sin errores
 # ---------------------------------------------------------------------------
@@ -61,8 +58,9 @@ def test_asignaciones_router_importa_sin_error():
 
 def test_asignaciones_usa_get_user_db_no_get_db():
     """asignaciones.py debe importar get_user_db y get_admin_db, NO llamar get_db directamente."""
-    import routers.asignaciones as mod
     import inspect
+
+    import routers.asignaciones as mod
 
     source = inspect.getsource(mod)
     # get_user_db debe estar presente
@@ -115,23 +113,18 @@ def test_tramite_models_importan():
     from models.tramite import (
         TRANSICIONES_VALIDAS,
         EstadoTramite,
-        TipoTramite,
-        TramiteCreate,
-        TramiteResponse,
-        TramiteListItem,
-        CambiarEstadoBody,
     )
     assert len(TRANSICIONES_VALIDAS) == len(EstadoTramite)
 
 
 def test_asignacion_model_importa():
-    from models.asignacion import AsignacionCreate, AsignacionResponse, ResolverAsignacionResponse
+    from models.asignacion import AsignacionCreate, ResolverAsignacionResponse
     assert AsignacionCreate is not None
     assert ResolverAsignacionResponse is not None
 
 
 def test_usuario_model_importa():
-    from models.usuario import UsuarioToken, RolUsuario, RamoUsuario
+    from models.usuario import RamoUsuario, RolUsuario
     assert len(list(RolUsuario)) == 4
     assert len(list(RamoUsuario)) == 4
 

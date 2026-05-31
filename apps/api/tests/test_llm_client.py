@@ -1,7 +1,8 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.llm_client import IAClient, get_ia_client, IAClientError, OCRProcessingError
+import pytest
+
+from core.llm_client import IAClient
 
 
 @pytest.fixture

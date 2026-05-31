@@ -5,8 +5,8 @@ Arranque:
     uvicorn main:app --reload --port 8000
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import logfire
 import structlog

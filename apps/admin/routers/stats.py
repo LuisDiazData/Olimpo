@@ -6,11 +6,11 @@ Endpoints:
 """
 
 from datetime import date, datetime, timedelta
+from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from uuid import UUID
 
 from core.auth import require_superadmin
 from core.database import get_admin_db

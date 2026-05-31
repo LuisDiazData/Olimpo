@@ -9,11 +9,8 @@ Cubre:
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-import pytest
-
-from models.tramite import EstadoTramite, TRANSICIONES_VALIDAS
+from models.tramite import TRANSICIONES_VALIDAS, EstadoTramite
 from routers.tramites import _enriquecer_tramite
-
 
 # ---------------------------------------------------------------------------
 # Helpers

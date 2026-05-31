@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from core.auth import get_current_user, get_current_user_or_agent, require_roles
 from core.database import get_admin_db, get_user_db
-from models.tramite import EstadoTramite, TRANSICIONES_VALIDAS
+from models.tramite import TRANSICIONES_VALIDAS, EstadoTramite
 from models.usuario import RolUsuario, UsuarioToken
 
 log = structlog.get_logger(__name__)
