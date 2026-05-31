@@ -28,7 +28,9 @@ jobs:
 
       - name: Instalar dependencias
         working-directory: apps/api
-        run: pip install --no-cache-dir -r requirements.txt
+        run: |
+          pip install --no-cache-dir -r requirements.txt
+          pip install --no-cache-dir ".[dev]"
 
       - name: Ruff — lint
         working-directory: apps/api
@@ -60,7 +62,9 @@ jobs:
 
       - name: Instalar dependencias
         working-directory: apps/api
-        run: pip install --no-cache-dir -r requirements.txt
+        run: |
+          pip install --no-cache-dir -r requirements.txt
+          pip install --no-cache-dir ".[dev]"
 
       - name: Pytest — tests unitarios
         working-directory: apps/api
