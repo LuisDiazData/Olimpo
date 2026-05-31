@@ -15,6 +15,7 @@ se genera aquí y se devuelve UNA SOLA VEZ en la respuesta — el Superadmin la
 anota y la entrega al director. Si se pierde, usar reset-password.
 """
 
+from typing import Any, cast
 from uuid import UUID
 
 import structlog
@@ -68,7 +69,7 @@ class ResetPasswordBody(BaseModel):
 # =============================================================================
 
 
-def _get_tenant_activo(tenant_id: UUID):
+def _get_tenant_activo(tenant_id: UUID) -> dict[str, Any]:
     """Obtiene el registro del tenant y verifica que esté activo. Lanza 404/403 si no."""
     db = get_admin_db()
     result = (
@@ -88,7 +89,7 @@ def _get_tenant_activo(tenant_id: UUID):
             detail={"error_code": "TENANT_NO_ENCONTRADO", "mensaje": "Tenant no encontrado."},
         )
 
-    tenant = result.data
+    tenant = cast(dict[str, Any], result.data)
     if not tenant["activo"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

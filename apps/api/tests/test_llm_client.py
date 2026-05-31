@@ -13,7 +13,9 @@ def mock_settings():
         settings_instance.OPENAI_API_KEY = "test-openai-key"
         settings_instance.ANTHROPIC_API_KEY = "test-anthropic-key"
         settings_instance.RUNPOD_API_KEY = "test-runpod-key"
-        settings_instance.RUNPOD_ENDPOINT_OCR = "https://api.runpod.ai/v2/test-endpoint/run"
+        settings_instance.RUNPOD_ENDPOINT_OCR = (
+            "https://api.runpod.ai/v2/test-endpoint/run"
+        )
         mock_get.return_value = settings_instance
         yield settings_instance
 
@@ -54,7 +56,10 @@ async def test_completar_tarea_liviana(mock_settings):
         mock_get.return_value = MagicMock(
             status_code=200,
             json=MagicMock(
-                return_value={"status": "COMPLETED", "output": "Esta es una respuesta liviana de prueba"}
+                return_value={
+                    "status": "COMPLETED",
+                    "output": "Esta es una respuesta liviana de prueba",
+                }
             ),
         )
 
@@ -95,7 +100,8 @@ async def test_ejecutar_ocr_exito(mock_settings):
     ):
         # Mock de post (encolar tarea)
         mock_post.return_value = MagicMock(
-            status_code=200, json=MagicMock(return_value={"id": "job_123", "status": "IN_QUEUE"})
+            status_code=200,
+            json=MagicMock(return_value={"id": "job_123", "status": "IN_QUEUE"}),
         )
 
         # Mock de get (polling status)
