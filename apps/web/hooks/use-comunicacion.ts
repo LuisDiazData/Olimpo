@@ -1,6 +1,6 @@
 "use client"
 
-import { api } from "./api"
+import { api } from "@/lib/api"
 
 export type Medio = "whatsapp" | "telefono" | "presencial"
 

@@ -423,12 +423,14 @@ export async function getDashboardData(
   const pctSla = slaTotal > 0 ? Math.round((slaCumplidos / slaTotal) * 100) : 100
 
   // Tiempo promedio de resolución
-  const resueltosTiempo = (resueltosTiempoRes.data ?? []).filter(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resueltosTiempo = ((resueltosTiempoRes.data ?? []) as any[]).filter(
     (t) => t.fecha_recepcion && t.updated_at
   )
   let tiempoPromedioDias: number | null = null
   if (resueltosTiempo.length > 0) {
-    const totalMs = resueltosTiempo.reduce((acc, t) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const totalMs = resueltosTiempo.reduce((acc: number, t: any) => {
       return acc + (new Date(t.updated_at as string).getTime() - new Date(t.fecha_recepcion as string).getTime())
     }, 0)
     tiempoPromedioDias = Math.round((totalMs / resueltosTiempo.length) / (1000 * 60 * 60 * 24) * 10) / 10
@@ -585,7 +587,8 @@ export async function getDashboardData(
 
   // ── Tramites sin movimiento > 5 días ───────────────────────────────────────
 
-  const tramitesEstancados: StalledTramite[] = (estancadosRes.data ?? []).map((t) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tramitesEstancados: StalledTramite[] = ((estancadosRes.data ?? []) as any[]).map((t) => {
     const dias = Math.floor(
       (ahoraMs - new Date(t.ultima_actividad as string).getTime()) / (1000 * 60 * 60 * 24)
     )
@@ -603,9 +606,9 @@ export async function getDashboardData(
 
   // ── Aggregations ───────────────────────────────────────────────────────────
 
-  const estadoMap = contarPorCampo(estadosRes.data ?? ([] as Record<string, unknown>), "estado")
-  const ramoMap = contarPorCampo(ramoRes.data ?? ([] as Record<string, unknown>), "ramo")
-  const tipoMap = contarPorCampo(tipoRes.data ?? ([] as Record<string, unknown>), "tipo_tramite")
+  const estadoMap = contarPorCampo(estadosRes.data ?? ([] as Record<string, unknown>[]), "estado")
+  const ramoMap = contarPorCampo(ramoRes.data ?? ([] as Record<string, unknown>[]), "ramo")
+  const tipoMap = contarPorCampo(tipoRes.data ?? ([] as Record<string, unknown>[]), "tipo_tramite")
   const slaMap = contarPorCampo(slaRows as Record<string, unknown>[], "estado")
 
   const porEstado: EstadoCount[] = Object.entries(estadoMap).map(([estado, count]) => ({
@@ -627,8 +630,10 @@ export async function getDashboardData(
     count,
   }))
 
-  const entradas = (entradasRes.data ?? []).map((t) => t.fecha_recepcion as string)
-  const resueltosTendencia = (resueltosRes.data ?? []).map((t) => t.updated_at as string)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entradas = ((entradasRes.data ?? []) as any[]).map((t) => t.fecha_recepcion as string)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resueltosTendencia = ((resueltosRes.data ?? []) as any[]).map((t) => t.updated_at as string)
   const tendencia = agruparPorSemana(entradas, resueltosTendencia, 8)
 
   // ── Carga por analista ───────────────────────────────────────────────────
@@ -670,7 +675,8 @@ export async function getDashboardData(
 
   // ── Alertas ──────────────────────────────────────────────────────────────
 
-  const alertasRaw = alertasRes.data ?? []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const alertasRaw = (alertasRes.data ?? []) as any[]
   const alertas: AlertaTramite[] = alertasRaw.map((t) => ({
     id: t.id as string,
     folio: t.folio as string,
