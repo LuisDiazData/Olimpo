@@ -45,7 +45,7 @@ def get_user_db(access_token: str) -> Client:
     """
     s = get_settings()
     options = ClientOptions(httpx_client=_shared_http_client)
-    client = create_client(s.SUPABASE_URL, s.SUPABASE_ANON_KEY, options=options)
+    client = create_client(s.SUPABASE_URL, s.SUPABASE_SERVICE_ROLE_KEY, options=options)
     client.postgrest.auth(access_token)
     return client
 

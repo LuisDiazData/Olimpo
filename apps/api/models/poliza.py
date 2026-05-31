@@ -100,6 +100,90 @@ class AseguradoListItem(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Búsqueda/creación inteligente de asegurado (deduplicación)
+# ---------------------------------------------------------------------------
+
+class AseguradoBuscarOCrearBody(BaseModel):
+    """
+    Payload para POST /asegurados/buscar-o-crear.
+    Usado por el Agente 4 y por la UI cuando el analista vincula un asegurado
+    a un trámite y quiere evitar crear duplicados.
+    """
+
+    nombre: str = Field(min_length=2, max_length=200)
+    rfc: str | None = Field(
+        default=None,
+        max_length=13,
+        pattern=r"^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$",
+        description="RFC del asegurado. Si se provee, tiene precedencia sobre nombre en la búsqueda.",
+    )
+    curp: str | None = Field(
+        default=None,
+        max_length=18,
+        pattern=r"^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9]{2}$",
+        description="CURP del asegurado. Segundo identificador más confiable después del RFC.",
+    )
+    tipo: TipoPersona | None = None
+    fecha_nacimiento: date | None = None
+    datos_adicionales: dict = Field(default_factory=dict)
+    similitud_minima: float | None = Field(
+        default=None,
+        ge=0.5,
+        le=1.0,
+        description=(
+            "Override del umbral de similitud fuzzy (0.5–1.0). "
+            "NULL usa el valor de configuracion_sistema (FUZZY_MATCH_ASEGURADO, default 0.80)."
+        ),
+    )
+
+
+class CandidatoAsegurado(BaseModel):
+    """Un asegurado candidato devuelto cuando la búsqueda es ambigua."""
+
+    id: UUID
+    nombre: str
+    rfc: str | None
+    curp: str | None
+    similitud: float = Field(description="Score de similitud pg_trgm (0–1).")
+
+    model_config = {"from_attributes": True}
+
+
+class AseguradoBuscarOCrearResponse(BaseModel):
+    """
+    Resultado de POST /asegurados/buscar-o-crear.
+
+    Cuando accion = 'ambiguo':
+      - asegurado_id es None
+      - requiere_atencion = True
+      - candidatos contiene hasta 5 registros existentes similares
+      - El llamador (Agente 4) debe marcar tramite.requiere_atencion = True
+        y agregar un tramite_evento con los candidatos para revisión humana
+
+    En cualquier otro caso asegurado_id está poblado y el registro existe en DB.
+    """
+
+    asegurado_id: UUID | None
+    accion: str = Field(
+        description=(
+            "encontrado_por_rfc | encontrado_por_curp | encontrado_por_nombre | "
+            "encontrado_por_rfc_race_condition | ambiguo | creado"
+        )
+    )
+    requiere_atencion: bool = Field(
+        description="True cuando la identidad es ambigua y un analista debe resolver."
+    )
+    candidatos: list[CandidatoAsegurado] = Field(
+        default_factory=list,
+        description="Candidatos con similitud alta. Poblado solo cuando accion = 'ambiguo'.",
+    )
+    asegurado: AseguradoResponse | None = Field(
+        default=None,
+        description="Datos completos del asegurado cuando accion != 'ambiguo'.",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Poliza_asegurado — vínculo
 # ---------------------------------------------------------------------------
 

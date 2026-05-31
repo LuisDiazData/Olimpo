@@ -66,7 +66,7 @@ def test_crear_tramite_retorna_201_con_folio(client_director):
     assert "folio" in data
     assert data["folio"]  # no vacío — generado por trigger
     assert data["estado"] == "recibido"
-    assert data["transiciones_disponibles"] == ["validando"]
+    assert data["transiciones_disponibles"] == ["en_revision"]
 
     # Limpieza
     from core.database import get_admin_db
@@ -95,26 +95,26 @@ def test_obtener_tramite_incluye_transiciones(client_director, tramite_recibido)
     assert response.status_code == 200
     data = response.json()
     assert data["estado"] == "recibido"
-    assert data["transiciones_disponibles"] == ["validando"]
+    assert data["transiciones_disponibles"] == ["en_revision"]
 
 
-def test_transicion_valida_recibido_a_validando(client_director, tramite_recibido):
-    """recibido → validando es la única transición válida desde recibido."""
+def test_transicion_valida_recibido_a_en_revision(client_director, tramite_recibido):
+    """recibido → en_revision es la única transición válida desde recibido."""
     tramite_id = tramite_recibido["id"]
     response = client_director.post(
         f"/api/v1/tramites/{tramite_id}/cambiar-estado",
-        json={"estado_nuevo": "validando"},
+        json={"estado_nuevo": "en_revision"},
     )
     assert response.status_code == 200
-    assert response.json()["estado"] == "validando"
+    assert response.json()["estado"] == "en_revision"
 
 
-def test_transicion_invalida_recibido_a_aprobado(client_director, tramite_recibido):
-    """recibido → aprobado debe retornar 422 TRANSICION_INVALIDA."""
+def test_transicion_invalida_recibido_a_completado(client_director, tramite_recibido):
+    """recibido → completado debe retornar 422 TRANSICION_INVALIDA."""
     tramite_id = tramite_recibido["id"]
     response = client_director.post(
         f"/api/v1/tramites/{tramite_id}/cambiar-estado",
-        json={"estado_nuevo": "aprobado"},
+        json={"estado_nuevo": "completado"},
     )
     assert response.status_code == 422
     detail = response.json()["detail"]

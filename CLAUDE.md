@@ -149,7 +149,38 @@ The complete schema is in the spec document (Section 6). Critical tables:
 
 ### Trámite State Machine
 
-`recibido` → `validando` → `pendiente_documentos` ↔ `completo` → `turnado_gnp` → `en_proceso_gnp` → `activado` (repeatable) → `aprobado` | `rechazado`
+Los estados se gestionan en dos tablas: `cat_estado_tramite` (catálogo con metadatos) y `estado_tramite_transicion` (transiciones válidas).
+
+#### Estados activos
+| id | Etiqueta | Descripción |
+|---|---|---|
+| `recibido` | Recibido | llegó por correo, sin asignar |
+| `en_revision` | En revisión | analista trabajando |
+| `pendiente_documentos_agente` | Docs. pendientes | se pidió al agente |
+| `turnado_a_gnp` | Turnado a GNP | enviado a GNP |
+| `activado_gnp` | Activado por GNP | GNP pide complemento |
+| `complemento_en_revision` | Complemento en revisión | procesado por analista |
+| `escalado` | Escalado | gerente/director intervino |
+
+#### Estados terminales
+| id | Etiqueta | Descripción |
+|---|---|---|
+| `completado` | Completado | GNP aprobó |
+| `rechazado_gnp` | Rechazado por GNP | GNP rechazó |
+| `cancelado` | Cancelado | cancelado antes de resolución |
+
+#### Flujo normal
+```
+recibido → en_revision → pendiente_documentos_agente ↔ turnado_a_gnp
+                                                    ↓
+                             activado_gnp ← GNP devuelve
+                                  ↓
+                          complemento_en_revision → turnado_a_gnp
+                                                    ↓
+                                         completado | rechazodo_gnp
+```
+
+Cualquier estado activo puede escalar → `escalado` → vuelve al estado correspondiente o se cancela.
 
 ---
 

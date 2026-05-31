@@ -1,0 +1,15 @@
+# Dueños de código por área
+# Estos usuarios son reviewers requeridos automáticamente en los PRs
+
+# Infraestructura y CI/CD
+.github/                    @luisdiaz
+infra/                      @luisdiaz
+apps/api/core/              @luisdiaz
+
+# Backend
+apps/api/                   @luisdiaz
+apps/admin/                 @luisdiaz
+
+# Frontend
+apps/web/                   @luisdiaz
+apps/admin-web/             @luisdiaz

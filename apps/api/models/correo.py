@@ -162,6 +162,14 @@ class CorreoListItem(BaseModel):
     id: UUID
     message_id: str | None
     thread_id: str | None
+    in_reply_to: str | None = Field(
+        default=None,
+        description=(
+            "Valor del header RFC 2822 In-Reply-To. "
+            "Para correos entrantes: extraído del email. "
+            "Para salientes: message_id del correo al que se responde."
+        ),
+    )
     tipo: TipoCorreo
     estado: EstadoCorreo
     de_email: str
@@ -186,13 +194,46 @@ class CorreoTramiteItem(CorreoListItem):
     model_config = {"from_attributes": True}
 
 
+class CorreoThreadItem(CorreoListItem):
+    """
+    Correo en el hilo del trámite con árbol de respuestas.
+    Devuelto por GET /tramites/{id}/correos/thread.
+    """
+
+    tramite_id: UUID
+    es_origen: bool = False
+    correo_padre_id: UUID | None = Field(
+        default=None,
+        description=(
+            "UUID del correo padre en la DB. "
+            "NULL = raíz del hilo o padre no encontrado en la DB. "
+            "Usar para construir el árbol localmente en la UI."
+        ),
+    )
+    cc_emails: list[str] = []
+
+    model_config = {"from_attributes": True}
+
+
 class CorreoResponse(CorreoListItem):
-    """Detalle completo con cuerpo y adjuntos vinculados."""
+    """Detalle completo con cuerpo, adjuntos y referencia al archivo raw en Storage."""
 
     cc_emails: list[str]
     cuerpo_html: str | None
     cuerpo_texto: str | None
     datos_agente2: dict | None
+    eml_storage_path: str | None = Field(
+        default=None,
+        description=(
+            "Ruta del archivo .eml completo en Supabase Storage. "
+            "NULL hasta que el Agente 1 finaliza la subida. "
+            "Usar junto con eml_storage_bucket para construir la referencia completa."
+        ),
+    )
+    eml_storage_bucket: str | None = Field(
+        default=None,
+        description="Bucket de Supabase Storage donde vive el .eml ('correos-inbox' o 'correos-archivados').",
+    )
     adjuntos: list[AdjuntoResponse] = []
 
     model_config = {"from_attributes": True}

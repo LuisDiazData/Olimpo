@@ -129,7 +129,13 @@ async def crear_activacion(
         )
 
     ot_id = result.data
-    ot_result = db.table("ot_activacion").select("*").eq("id", str(ot_id)).execute()
+    ot_result = db.table("ot_activacion").select("*").eq("id", str(ot_id)).maybe_single().execute()
+
+    if not ot_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error_code": "ERROR_ACTIVACION", "mensaje": "La activaciÃ³n se registrÃ³ pero no se pudo recuperar."},
+        )
 
     log.info("activacion_gnp_registrada", tramite_id=str(tramite_id), ot=body.numero_ot, por=str(usuario.id))
     return ActivacionResponse.model_validate(ot_result.data)

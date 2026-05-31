@@ -20,6 +20,7 @@ ENV/
 .env
 .env.*
 !.env.example
+!.env.local.example
 
 # ── Test & coverage ───────────────────────────────────────────────────────────
 .pytest_cache/
@@ -66,3 +67,6 @@ olimpo_modelo_datos_erd.html
 
 # ── Claude Code interno ───────────────────────────────────────────────────────
 .claude/
+#-----Mcp-----
+.mcp.json
+opencode.json

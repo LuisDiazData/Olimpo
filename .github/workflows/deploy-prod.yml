@@ -1,0 +1,169 @@
+name: Deploy — Producción
+
+on:
+  push:
+    branches: [main]
+
+# Solo un despliegue a producción a la vez; nunca cancelar en progreso
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. Migraciones de base de datos — requiere aprobación manual (env: production)
+  # ─────────────────────────────────────────────────────────────────────────────
+  migrate-prod:
+    name: Supabase — Migraciones producción
+    runs-on: ubuntu-latest
+    environment: production   # ← pausa aquí hasta que un reviewer apruebe
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Enlazar directorio de migraciones
+        run: ln -sf $GITHUB_WORKSPACE/infra/supabase/migrations $GITHUB_WORKSPACE/supabase/migrations
+
+      - name: Aplicar migraciones pendientes
+        run: supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. API FastAPI → Railway (production)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-api-prod:
+    name: API → Railway producción
+    needs: migrate-prod
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Railway CLI
+        run: npm install -g @railway/cli@latest
+
+      - name: Desplegar API
+        working-directory: apps/api
+        run: railway up --service olimpo-api --environment production --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. Admin API → Railway (production)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-admin-prod:
+    name: Admin API → Railway producción
+    needs: migrate-prod
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Railway CLI
+        run: npm install -g @railway/cli@latest
+
+      - name: Desplegar Admin API
+        working-directory: apps/admin
+        run: railway up --service olimpo-admin --environment production --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. Frontend Web CRM → Vercel (producción)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-web-prod:
+    name: Web CRM → Vercel producción
+    needs: deploy-api-prod
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Bajar configuración de Vercel
+        working-directory: apps/web
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+      - name: Build producción
+        working-directory: apps/web
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+      - name: Deploy producción
+        working-directory: apps/web
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 5. Admin Web → Vercel (producción)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-admin-web-prod:
+    name: Admin Web → Vercel producción
+    needs: deploy-admin-prod
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Bajar configuración de Vercel
+        working-directory: apps/admin-web
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Build producción
+        working-directory: apps/admin-web
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Deploy producción
+        working-directory: apps/admin-web
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 6. Notificación final
+  # ─────────────────────────────────────────────────────────────────────────────
+  notify-deploy:
+    name: Notificar despliegue exitoso
+    needs: [deploy-web-prod, deploy-admin-web-prod]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Resumen del despliegue
+        run: |
+          echo "## Despliegue a producción completado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Por:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fecha:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY

@@ -242,7 +242,7 @@ async def eliminar_cobertura(
     db = get_user_db(usuario.access_token)
 
     result = db.table("cobertura_vacaciones").select("id, fecha_inicio, fecha_fin").eq("id", str(cobertura_id)).maybe_single().execute()
-    if not result:
+    if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error_code": "COBERTURA_NO_ENCONTRADA", "mensaje": "Cobertura de vacaciones no encontrada."},

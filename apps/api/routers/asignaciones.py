@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router de asignaciones (agente + ramo â†’ analista).
 
 GET    /asignaciones                     â€” lista de reglas de asignaciÃ³n
@@ -8,6 +8,7 @@ GET    /asignaciones/resolver            â€” analista efectivo hoy (aplica 
 """
 
 from datetime import date
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -17,7 +18,10 @@ from core.auth import get_current_user, get_current_user_or_agent, require_roles
 from core.database import get_user_db
 from models.asignacion import (
     AsignacionCreate,
+    AsignacionUpdate,
     AsignacionResponse,
+    BulkAsignacionCreate,
+    BulkAsignacionResult,
     ResolverAsignacionResponse,
 )
 from models.usuario import RamoUsuario, RolUsuario, UsuarioToken
@@ -68,7 +72,10 @@ async def listar_asignaciones(
         query = query.eq("analista_id", str(analista_id))
 
     result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
-    return [AsignacionResponse.model_validate(a) for a in result.data]
+    items: list[AsignacionResponse] = []
+    for a in result.data:
+        items.append(AsignacionResponse.model_validate(a))
+    return items
 
 
 # ---------------------------------------------------------------------------
@@ -205,3 +212,116 @@ async def desactivar_asignacion(
             detail={"error_code": "ASIGNACION_NO_ENCONTRADA", "mensaje": "AsignaciÃ³n no encontrada."},
         )
     log.info("asignacion_desactivada", id=str(asignacion_id), por=str(usuario.id))
+
+
+# ---------------------------------------------------------------------------
+# PATCH /asignaciones/{id}
+# ---------------------------------------------------------------------------
+
+@router.patch(
+    "/asignaciones/{asignacion_id}",
+    response_model=AsignacionResponse,
+    dependencies=_ESCRITURA,
+    summary="Actualizar regla de asignación",
+    description="Permite cambiar el analista asignado o reactivarla.",
+)
+async def actualizar_asignacion(
+    asignacion_id: UUID,
+    body: AsignacionUpdate,
+    usuario: UsuarioToken = Depends(get_current_user),
+) -> AsignacionResponse:
+    from core.database import get_admin_db
+    db_admin = get_admin_db()
+
+    cambios = body.model_dump(exclude_none=True)
+    if not cambios:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="No se enviaron campos para actualizar.",
+        )
+
+    result = db_admin.table("asignacion").select(
+        "id, agente_id, ramo, analista_id, notas, asignado_por, activo, created_at, updated_at"
+    ).eq("id", str(asignacion_id)).maybe_single().execute()
+
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asignación no encontrada.")
+
+    db_admin.table("asignacion").update(cambios).eq("id", str(asignacion_id)).execute()
+
+    refreshed = db_admin.table("asignacion").select(
+        "id, agente_id, ramo, analista_id, notas, asignado_por, activo, created_at, updated_at"
+    ).eq("id", str(asignacion_id)).execute()
+
+    log.info("asignacion_actualizada", id=str(asignacion_id), cambios=cambios, por=str(usuario.id))
+    return AsignacionResponse.model_validate(refreshed.data[0])
+
+
+# ---------------------------------------------------------------------------
+# POST /asignaciones/bulk
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/asignaciones/bulk",
+    response_model=BulkAsignacionResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=_ESCRITURA,
+    summary="Asignación masiva de agentes a analista por ramo",
+    description=(
+        "Recibe una lista de agentes y un ramo+analista. "
+        "Crea UNA regla de asignación por cada agente. "
+        "Si ya existe una asignación activa para ese agente+ramo, esa fila se salta (no error). "
+        "Retorna el resumen de creados, saltados y errores."
+    ),
+)
+async def asignacion_masiva(
+    body: BulkAsignacionCreate,
+    usuario: UsuarioToken = Depends(get_current_user),
+) -> BulkAsignacionResult:
+    from core.database import get_admin_db
+    db_admin = get_admin_db()
+
+    agente_ids = [str(aid) for aid in body.agente_ids]
+
+    existing_q = db_admin.table("asignacion").select(
+        "agente_id, ramo"
+    ).in_("agente_id", agente_ids).eq("ramo", body.ramo.value).eq("activo", True).execute()
+
+    existing_keys: set[tuple[str, str]] = {
+        (r["agente_id"], r["ramo"]) for r in (existing_q.data or [])
+    }
+
+    detalle: list[str] = []
+    creados = 0
+    saltados = 0
+    errores = 0
+
+    for agente_id in agente_ids:
+        key = (agente_id, body.ramo.value)
+        if key in existing_keys:
+            saltados += 1
+            detalle.append(f"Saltado agente {agente_id}: ya tiene asignación activa para {body.ramo.value}.")
+            continue
+
+        try:
+            db_admin.table("asignacion").insert({
+                "agente_id":     agente_id,
+                "ramo":          body.ramo.value,
+                "analista_id":   str(body.analista_id),
+                "asignado_por":  str(usuario.id),
+                "notas":         body.notas,
+            }).execute()
+            creados += 1
+        except Exception as exc:
+            errores += 1
+            detalle.append(f"Error agente {agente_id}: {exc}")
+
+    log.info("asignacion_masiva", creados=creados, saltados=saltados, errores=errores, por=str(usuario.id))
+
+    return BulkAsignacionResult(
+        total=len(body.agente_ids),
+        creados=creados,
+        saltados=saltados,
+        errores=errores,
+        detalle=detalle,
+    )

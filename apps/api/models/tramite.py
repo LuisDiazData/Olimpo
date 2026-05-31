@@ -20,14 +20,15 @@ from pydantic import BaseModel, Field
 
 class EstadoTramite(StrEnum):
     recibido = "recibido"
-    validando = "validando"
-    pendiente_documentos = "pendiente_documentos"
-    completo = "completo"
-    turnado_gnp = "turnado_gnp"
-    en_proceso_gnp = "en_proceso_gnp"
-    activado = "activado"
-    aprobado = "aprobado"
-    rechazado = "rechazado"
+    en_revision = "en_revision"
+    pendiente_documentos_agente = "pendiente_documentos_agente"
+    turnado_a_gnp = "turnado_a_gnp"
+    activado_gnp = "activado_gnp"
+    complemento_en_revision = "complemento_en_revision"
+    escalado = "escalado"
+    completado = "completado"
+    rechazado_gnp = "rechazado_gnp"
+    cancelado = "cancelado"
 
 
 class TipoTramite(StrEnum):
@@ -74,31 +75,45 @@ class TipoEventoTramite(StrEnum):
 # ---------------------------------------------------------------------------
 
 TRANSICIONES_VALIDAS: dict[EstadoTramite, list[EstadoTramite]] = {
-    EstadoTramite.recibido: [EstadoTramite.validando],
-    EstadoTramite.validando: [
-        EstadoTramite.pendiente_documentos,
-        EstadoTramite.completo,
+    EstadoTramite.recibido: [
+        EstadoTramite.en_revision,
     ],
-    EstadoTramite.pendiente_documentos: [
-        EstadoTramite.completo,
-        EstadoTramite.validando,
+    EstadoTramite.en_revision: [
+        EstadoTramite.pendiente_documentos_agente,
+        EstadoTramite.turnado_a_gnp,
+        EstadoTramite.escalado,
     ],
-    EstadoTramite.completo: [
-        EstadoTramite.pendiente_documentos,
-        EstadoTramite.turnado_gnp,
+    EstadoTramite.pendiente_documentos_agente: [
+        EstadoTramite.en_revision,
+        EstadoTramite.escalado,
+        EstadoTramite.cancelado,
     ],
-    EstadoTramite.turnado_gnp: [EstadoTramite.en_proceso_gnp],
-    EstadoTramite.en_proceso_gnp: [
-        EstadoTramite.activado,
-        EstadoTramite.rechazado,
+    EstadoTramite.turnado_a_gnp: [
+        EstadoTramite.activado_gnp,
+        EstadoTramite.completado,
+        EstadoTramite.rechazado_gnp,
     ],
-    EstadoTramite.activado: [
-        EstadoTramite.en_proceso_gnp,  # endosos con múltiples activaciones
-        EstadoTramite.aprobado,
-        EstadoTramite.rechazado,
+    EstadoTramite.activado_gnp: [
+        EstadoTramite.complemento_en_revision,
+        EstadoTramite.rechazado_gnp,
+        EstadoTramite.escalado,
+        EstadoTramite.cancelado,
     ],
-    EstadoTramite.aprobado: [],   # terminal
-    EstadoTramite.rechazado: [],  # terminal
+    EstadoTramite.complemento_en_revision: [
+        EstadoTramite.turnado_a_gnp,
+        EstadoTramite.escalado,
+        EstadoTramite.cancelado,
+    ],
+    EstadoTramite.escalado: [
+        EstadoTramite.en_revision,
+        EstadoTramite.pendiente_documentos_agente,
+        EstadoTramite.activado_gnp,
+        EstadoTramite.complemento_en_revision,
+        EstadoTramite.cancelado,
+    ],
+    EstadoTramite.completado: [],    # terminal
+    EstadoTramite.rechazado_gnp: [], # terminal
+    EstadoTramite.cancelado: [],     # terminal
 }
 
 
@@ -143,22 +158,54 @@ class CambiarEstadoBody(BaseModel):
     motivo_rechazo_gnp: str | None = Field(
         default=None,
         max_length=1000,
-        description="Obligatorio cuando estado_nuevo='rechazado'. Texto del motivo de rechazo de GNP.",
+        description="Obligatorio cuando estado_nuevo='rechazado_gnp'. Texto del motivo de rechazo de GNP.",
     )
     motivo: str | None = Field(
         default=None,
         max_length=500,
-        description="Obligatorio cuando estado_nuevo='pendiente_documentos'. Describe qué documentos faltan.",
+        description="Obligatorio cuando estado_nuevo='pendiente_documentos_agente'. Describe qué documentos faltan.",
     )
     folio_ot: str | None = Field(
         default=None,
         max_length=30,
-        description="Número de OT asignado por GNP. Registrar al turnar (estado='turnado_gnp').",
+        description="Número de OT asignado por GNP. Registrar al turnar (estado='turnado_a_gnp').",
+    )
+
+
+class ReasignacionMasivaBody(BaseModel):
+    """Reasigna todos los trámites activos de un analista a otro en una sola operación."""
+
+    analista_origen_id: UUID = Field(
+        description="Analista cuyos trámites se van a reasignar (p. ej., el que está de vacaciones)."
+    )
+    analista_destino_id: UUID = Field(
+        description="Analista que recibirá los trámites."
+    )
+    motivo: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Motivo de la reasignación masiva. Se registra en el evento de cada trámite.",
+    )
+    solo_estados: list[str] | None = Field(
+        default=None,
+        description=(
+            "Si se indica, solo se reasignan trámites en esos estados. "
+            "Por defecto se reasignan todos los estados no terminales."
+        ),
     )
 
 
 class AsignarAnalistaBody(BaseModel):
     analista_id: UUID
+    motivo: str | None = Field(
+        default=None,
+        max_length=500,
+        description=(
+            "Motivo de la reasignación. Opcional en la primera asignación, "
+            "recomendado en reasignaciones. Se guarda en el evento del historial. "
+            "Ejemplos: 'Vacaciones del analista', 'Exceso de carga de trabajo'."
+        ),
+    )
 
 
 class AgregarNotaBody(BaseModel):
@@ -243,6 +290,10 @@ class TramiteResponse(BaseModel):
     motivo_rechazo_gnp: str | None
     ultima_actividad: datetime
 
+    # Correo que originó el trámite (primer correo vinculado con es_origen=true)
+    correo_origen_email: str | None = None
+    correo_origen_nombre: str | None = None
+
     activo: bool
     created_at: datetime
     updated_at: datetime
@@ -251,7 +302,7 @@ class TramiteResponse(BaseModel):
     transiciones_disponibles: list[str] = Field(
         default_factory=list,
         description="Estados a los que puede transicionar este trámite desde su estado actual. "
-                    "Vacío si está en un estado terminal (aprobado, rechazado)."
+                    "Vacío si está en un estado terminal (completado, rechazado_gnp, cancelado)."
     )
 
     model_config = {"from_attributes": True}
@@ -260,6 +311,19 @@ class TramiteResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Tramite Evento — modelos
 # ---------------------------------------------------------------------------
+
+class ContactoTramiteResponse(BaseModel):
+    """Persona involucrada en el trámite (agente, analista, gerente, asistente)."""
+
+    id: str
+    nombre: str
+    email: str | None = None
+    telefono: str | None = None
+    rol: str  # agente | analista | gerente | asistente
+    cua: str | None = None
+
+    model_config = {"from_attributes": True}
+
 
 class EventoResponse(BaseModel):
     """Un evento en el timeline del trámite."""

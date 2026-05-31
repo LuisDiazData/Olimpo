@@ -32,6 +32,7 @@ from models.correo import (
     AdjuntoResponse,
     CorreoListItem,
     CorreoResponse,
+    CorreoThreadItem,
     CorreoTramiteItem,
     CorreoTramiteVinculo,
     CorreoUpdate,
@@ -57,14 +58,18 @@ _SOLO_DIRECTORES = [
 # ---------------------------------------------------------------------------
 
 _SEL_CORREO_LIST = (
-    "id, message_id, thread_id, tipo, estado, de_email, de_nombre, "
+    "id, message_id, thread_id, in_reply_to, tipo, estado, de_email, de_nombre, "
     "para_emails, asunto, fecha_correo, fecha_envio, analista_id, "
     "created_at, updated_at, "
     "usuario!correo_analista_id_fkey!left(nombre)"
 )
 
 _SEL_CORREO_DETAIL = (
-    "*, "
+    "id, message_id, thread_id, in_reply_to, tipo, estado, de_email, de_nombre, "
+    "para_emails, cc_emails, asunto, cuerpo_html, cuerpo_texto, "
+    "fecha_correo, fecha_envio, datos_agente2, analista_id, "
+    "eml_storage_path, eml_storage_bucket, "
+    "created_at, updated_at, "
     "usuario!correo_analista_id_fkey!left(nombre), "
     "adjunto(id, correo_id, adjunto_padre_id, nombre_archivo, tipo_mime, "
     "tamanio_bytes, storage_path, password_eliminado, estado, "
@@ -119,7 +124,7 @@ def _get_correo_o_404(db, correo_id: UUID) -> dict:
         .maybe_single()
         .execute()
     )
-    if not result:
+    if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Correo no encontrado.")
     return result.data
 
@@ -190,7 +195,7 @@ async def obtener_correo(
         .maybe_single()
         .execute()
     )
-    if not result:
+    if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Correo no encontrado.")
     return _armar_correo_response(result.data)
 
@@ -299,6 +304,38 @@ async def listar_correos_tramite(
     return items
 
 
+@router.get(
+    "/tramites/{tramite_id}/correos/thread",
+    response_model=list[CorreoThreadItem],
+    summary="Hilo de conversación del trámite",
+    description=(
+        "Devuelve todos los correos del trámite ordenados cronológicamente, "
+        "con el campo correo_padre_id que permite a la UI construir el árbol de respuestas. "
+        "Correos raíz: correo_padre_id = null. "
+        "Hijos: correo_padre_id = id del correo que respondieron."
+    ),
+)
+async def obtener_thread_tramite(
+    tramite_id: UUID,
+    usuario: UsuarioToken = Depends(get_current_user),
+) -> list[CorreoThreadItem]:
+    db = get_user_db(usuario.access_token)
+    result = (
+        db.table("correo_thread_vista")
+        .select(
+            "tramite_id, es_origen, correo_padre_id, "
+            "id, message_id, thread_id, in_reply_to, tipo, estado, "
+            "de_email, de_nombre, para_emails, cc_emails, asunto, "
+            "fecha_correo, fecha_envio, analista_id, analista_nombre, "
+            "created_at, updated_at"
+        )
+        .eq("tramite_id", str(tramite_id))
+        .order("fecha_correo")
+        .execute()
+    )
+    return [CorreoThreadItem.model_validate(row) for row in result.data]
+
+
 @router.post(
     "/tramites/{tramite_id}/correos/{correo_id}",
     response_model=CorreoTramiteVinculo,
@@ -376,7 +413,7 @@ async def obtener_adjunto(
         .maybe_single()
         .execute()
     )
-    if not result:
+    if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Adjunto no encontrado.")
     return AdjuntoResponse.model_validate(result.data)
 
@@ -417,7 +454,7 @@ async def obtener_documento(
         .maybe_single()
         .execute()
     )
-    if not result:
+    if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado.")
     return _armar_documento_response(result.data)
 

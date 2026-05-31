@@ -171,3 +171,60 @@ class AgenteResponse(BaseModel):
     asistentes: list[AsistenteResponse] = []
 
     model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Bulk import (Excel)
+# ---------------------------------------------------------------------------
+
+class AgenteImportRow(BaseModel):
+    cua: str = Field(min_length=1, max_length=20)
+    nombre: str = Field(min_length=2, max_length=150)
+    nombre_comercial: str | None = Field(default=None, max_length=150)
+    rfc: str | None = Field(default=None, max_length=13)
+    fecha_afiliacion: str | None = Field(default=None, description="YYYY-MM-DD")
+    email: str | None = Field(default=None, max_length=254)
+    telefono: str | None = Field(default=None, max_length=20)
+    tipo_telefono: TipoTelefono | None = None
+    notas: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("cua")
+    @classmethod
+    def cua_upper(cls, v: str) -> str:
+        return v.strip().upper()
+
+    @field_validator("nombre")
+    @classmethod
+    def nombre_strip(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("rfc")
+    @classmethod
+    def rfc_upper(cls, v: str | None) -> str | None:
+        return v.strip().upper() if v else None
+
+
+class ImportPreviewItem(BaseModel):
+    row: int
+    data: AgenteImportRow
+    errors: list[str] = []
+    will_create: bool = True
+    will_update: bool = False
+    existing_id: str | None = None
+
+
+class ImportResultItem(BaseModel):
+    row: int
+    cua: str
+    success: bool
+    agente_id: str | None = None
+    error: str | None = None
+
+
+class ImportResponse(BaseModel):
+    total: int
+    exitosos: int
+    fallidos: int
+    errores_duplicados: int
+    results: list[ImportResultItem]
+    detalle: str

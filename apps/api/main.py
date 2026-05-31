@@ -21,12 +21,16 @@ from routers import (
     agentes,
     asignaciones,
     coberturas,
+    comunicaciones,
     correos,
+    gmail_webhook,
     health,
     notificaciones,
+    permisos,
     pipeline,
     polizas,
     slas,
+    test_ia,
     tramites,
     usuarios,
 )
@@ -67,8 +71,8 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=s.cors_origins_list,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Agent-API-Key"],
     )
 
     # -------------------------------------------------------------------------
@@ -92,17 +96,21 @@ def create_app() -> FastAPI:
     # Routers
     # -------------------------------------------------------------------------
     app.include_router(health.router)
+    app.include_router(gmail_webhook.router)   # sin prefix: /webhook/gmail (URL fija para Pub/Sub)
     app.include_router(usuarios.router, prefix="/api/v1")
     app.include_router(agentes.router, prefix="/api/v1")
     app.include_router(asignaciones.router, prefix="/api/v1")
     app.include_router(tramites.router, prefix="/api/v1")
     app.include_router(polizas.router, prefix="/api/v1")
     app.include_router(correos.router, prefix="/api/v1")
+    app.include_router(comunicaciones.router, prefix="/api/v1")
     app.include_router(activaciones.router, prefix="/api/v1")
     app.include_router(notificaciones.router, prefix="/api/v1")
     app.include_router(slas.router, prefix="/api/v1")
     app.include_router(coberturas.router, prefix="/api/v1")
     app.include_router(pipeline.router, prefix="/api/v1")
+    app.include_router(permisos.router, prefix="/api/v1")
+    app.include_router(test_ia.router, prefix="/api/v1")
 
     return app
 

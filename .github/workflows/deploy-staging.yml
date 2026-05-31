@@ -1,0 +1,156 @@
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [develop]
+
+# Solo un despliegue a staging a la vez; cancela el anterior si hay uno en cola
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. Migraciones de base de datos — SIEMPRE primero
+  # ─────────────────────────────────────────────────────────────────────────────
+  migrate-staging:
+    name: Supabase — Migraciones staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Las migraciones están en infra/supabase/migrations/ — enlazar al path
+      # que espera la CLI de Supabase (supabase/migrations/)
+      - name: Enlazar directorio de migraciones
+        run: ln -sf $GITHUB_WORKSPACE/infra/supabase/migrations $GITHUB_WORKSPACE/supabase/migrations
+
+      - name: Aplicar migraciones pendientes
+        run: supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_ID_STAGING }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_STAGING }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. API FastAPI → Railway (staging)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-api-staging:
+    name: API → Railway staging
+    needs: migrate-staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Railway CLI
+        run: npm install -g @railway/cli@latest
+
+      - name: Desplegar API
+        working-directory: apps/api
+        run: railway up --service olimpo-api --environment staging --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. Admin API → Railway (staging)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-admin-staging:
+    name: Admin API → Railway staging
+    needs: migrate-staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Railway CLI
+        run: npm install -g @railway/cli@latest
+
+      - name: Desplegar Admin API
+        working-directory: apps/admin
+        run: railway up --service olimpo-admin --environment staging --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. Frontend Web CRM → Vercel (preview con alias staging)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-web-staging:
+    name: Web CRM → Vercel staging
+    needs: deploy-api-staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Bajar configuración de Vercel
+        working-directory: apps/web
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+      - name: Build
+        working-directory: apps/web
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+      - name: Deploy con alias staging
+        working-directory: apps/web
+        run: |
+          vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} \
+            --alias staging.olimpo.mx
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 5. Admin Web → Vercel (preview con alias staging-admin)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-admin-web-staging:
+    name: Admin Web → Vercel staging
+    needs: deploy-admin-staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Bajar configuración de Vercel
+        working-directory: apps/admin-web
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Build
+        working-directory: apps/admin-web
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Deploy con alias staging-admin
+        working-directory: apps/admin-web
+        run: |
+          vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} \
+            --alias staging-admin.olimpo.mx
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}

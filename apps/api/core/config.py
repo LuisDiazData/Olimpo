@@ -20,12 +20,25 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str
     SUPABASE_JWT_SECRET: str
+    # JSON con las JWKS del proyecto Supabase. Opcional: si no se configura,
+    # el sistema las obtiene dinámicamente desde /auth/v1/jwks. Útil como
+    # caché offline o en entornos sin acceso a internet al arranque.
+    # Obtener desde: Project Settings → API → JWT Settings → JWKS en Supabase.
+    SUPABASE_JWKS_JSON: str = ""
+
+    @property
+    def supabase_jwks(self) -> dict:
+        import json
+        if self.SUPABASE_JWKS_JSON:
+            return json.loads(self.SUPABASE_JWKS_JSON)
+        return {"keys": []}
 
     # -------------------------------------------------------------------------
     # LLMs
     # -------------------------------------------------------------------------
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     RUNPOD_API_KEY: str = ""
     RUNPOD_ENDPOINT_OCR: str = ""
 
@@ -34,6 +47,9 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     GOOGLE_SERVICE_ACCOUNT_JSON: str = ""
     GOOGLE_WORKSPACE_DOMAIN: str = ""
+    GMAIL_WEBHOOK_TOKEN: str = ""
+    GMAIL_PUBSUB_TOPIC: str = ""
+    SUPABASE_STORAGE_BUCKET_ADJUNTOS: str = "correos-adjuntos"
 
     # -------------------------------------------------------------------------
     # Observabilidad

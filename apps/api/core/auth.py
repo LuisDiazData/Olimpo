@@ -6,7 +6,7 @@ Dos mecanismos de autenticación:
 1. JWT de Supabase (usuarios humanos — frontend):
    - El frontend obtiene un JWT al hacer login con Supabase Auth.
    - Cada request incluye: Authorization: Bearer <jwt>
-   - Se verifica la firma con SUPABASE_JWT_SECRET (HS256).
+   - Se verifica la firma con JWKS (ES256) o secret legacy (HS256).
    - Extrae sub (user UUID), rol y ramo de app_metadata.
 
 2. API key (agentes externos — MCP):
@@ -17,8 +17,11 @@ Dos mecanismos de autenticación:
 """
 
 import hashlib
+import json
+import base64
 from uuid import UUID
 
+import httpx
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
@@ -29,6 +32,87 @@ from models.usuario import RamoUsuario, RolUsuario, UsuarioToken
 _bearer = HTTPBearer(auto_error=True)
 _api_key_header = APIKeyHeader(name="X-Agent-API-Key", auto_error=False)
 
+_JWKS_CACHE: dict | None = None
+_JWKS_CACHE_TTL = 3600
+_JWKS_FETCHED_AT = 0.0
+
+
+# =============================================================================
+# JWKS helpers (ES256 verification for Supabase v2)
+# =============================================================================
+
+def _get_jwks(supabase_url: str, anon_key: str) -> dict:
+    """Fetch and cache JWKS from Supabase Auth, fallback to hardcoded keys."""
+    global _JWKS_CACHE, _JWKS_FETCHED_AT
+    import time
+
+    if _JWKS_CACHE is not None and (time.time() - _JWKS_FETCHED_AT) < _JWKS_CACHE_TTL:
+        return _JWKS_CACHE
+
+    try:
+        import httpx
+        resp = httpx.get(
+            f"{supabase_url}/auth/v1/.well-known/jwks.json",
+            headers={"apikey": anon_key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        _JWKS_CACHE = resp.json()
+        _JWKS_FETCHED_AT = time.time()
+        return _JWKS_CACHE
+    except Exception:
+        pass
+
+    s = get_settings()
+    return s.supabase_jwks
+
+
+def _build_public_key(jwk: dict) -> bytes:
+    """Build a raw EC public key from JWK x/y coordinates (P-256 / ES256)."""
+    from cryptography.hazmat.primitives.asymmetric.ec import (
+        EllipticCurvePublicKey,
+        SECP256R1,
+    )
+    from cryptography.hazmat.primitives import serialization
+
+    x_bytes = base64url_decode(jwk["x"])
+    y_bytes = base64url_decode(jwk["y"])
+    public_key = EllipticCurvePublicKey.from_encoded_point(
+        SECP256R1(), b"\x04" + x_bytes + y_bytes
+    )
+    return public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+
+def base64url_decode(data: str) -> bytes:
+    """Decode a base64url string (URL-safe base64 without padding)."""
+    import base64
+    data = data + "=" * (4 - len(data) % 4)
+    return base64.urlsafe_b64decode(data)
+
+
+def _decode_jwt_es256(token: str, supabase_url: str, anon_key: str) -> dict:
+    """Verify ES256 JWT using JWKS."""
+    parts = token.split(".")
+    header_raw = parts[0]
+    header = json.loads(base64url_decode(header_raw))
+    kid = header.get("kid")
+
+    jwks = _get_jwks(supabase_url, anon_key)
+    jwk = None
+    for k in jwks.get("keys", []):
+        if k.get("kid") == kid:
+            jwk = k
+            break
+
+    if jwk is None:
+        raise ValueError(f"Key {kid} not found in JWKS")
+
+    public_key = _build_public_key(jwk)
+    return jwt.decode(token, public_key, algorithms=["ES256"], audience="authenticated")
+
 
 # =============================================================================
 # MECANISMO 1: JWT de Supabase (usuarios humanos)
@@ -37,8 +121,19 @@ _api_key_header = APIKeyHeader(name="X-Agent-API-Key", auto_error=False)
 def _decode_jwt(token: str) -> dict:
     """Decodifica y valida la firma del JWT de Supabase. Lanza HTTPException si es inválido."""
     s = get_settings()
+
+    # Intentar ES256 primero (Supabase v2 JWKS)
     try:
-        payload = jwt.decode(
+        header_raw = token.split(".")[0]
+        header = json.loads(base64url_decode(header_raw))
+        if header.get("alg") == "ES256":
+            return _decode_jwt_es256(token, s.SUPABASE_URL, s.SUPABASE_ANON_KEY)
+    except (ValueError, KeyError, jwt.InvalidTokenError, Exception):
+        pass
+
+    # Fallback a HS256 con secret legacy
+    try:
+        return jwt.decode(
             token,
             s.SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
@@ -57,7 +152,6 @@ def _decode_jwt(token: str) -> dict:
             detail=f"Token inválido: {exc}",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return payload
 
 
 def get_current_user(
@@ -194,6 +288,42 @@ def get_agent_token(
         ramo=ramo,
         access_token="",
     )
+
+
+# =============================================================================
+# PERMISOS GRANULARES
+# =============================================================================
+
+def require_permiso(clave: str):
+    """
+    Dependencia de fábrica que valida un permiso granular del usuario autenticado.
+    Consulta la función SQL tiene_permiso() que resuelve overrides de usuario y
+    defaults de rol en una sola llamada.
+
+    Uso:
+        @router.post("/reasignar", dependencies=[Depends(require_permiso("tramites.reasignar"))])
+
+    El permiso se evalúa en el cliente admin (service_role) para evitar que RLS
+    sobre las tablas de permisos bloquee la verificación.
+    """
+    def _check(caller: UsuarioToken = Depends(get_current_user)) -> UsuarioToken:
+        from core.database import get_admin_db
+        admin = get_admin_db()
+        result = admin.rpc(
+            "tiene_permiso",
+            {"p_usuario_id": str(caller.id), "p_clave": clave},
+        ).execute()
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error_code": "PERMISO_DENEGADO",
+                    "mensaje": f"No tienes el permiso requerido: '{clave}'.",
+                    "permiso_requerido": clave,
+                },
+            )
+        return caller
+    return _check
 
 
 def get_current_user_or_agent(

@@ -22,12 +22,15 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from core.auth import get_current_user, require_roles
-from core.database import get_user_db
+from core.database import get_admin_db_dep, get_user_db
 from models.poliza import (
+    AseguradoBuscarOCrearBody,
+    AseguradoBuscarOCrearResponse,
     AseguradoCreate,
     AseguradoListItem,
     AseguradoResponse,
     AseguradoUpdate,
+    CandidatoAsegurado,
     PolizaAseguradoCreate,
     PolizaAseguradoResponse,
     PolizaCreate,
@@ -53,8 +56,8 @@ def _get_poliza_o_404(db, poliza_id: UUID) -> dict:
     result = (
         db.table("poliza").select("id, activo").eq("id", str(poliza_id)).maybe_single().execute()
     )
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PÃ³liza no encontrada.")
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Póliza no encontrada.")
     return result.data
 
 
@@ -113,13 +116,83 @@ async def crear_asegurado(
     return AseguradoResponse.model_validate(result.data)
 
 
+@router.post(
+    "/asegurados/buscar-o-crear",
+    response_model=AseguradoBuscarOCrearResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Buscar o crear asegurado con deduplicación",
+    description=(
+        "Resolución de identidad para asegurados: busca por RFC → CURP → nombre fuzzy → crea nuevo. "
+        "Cuando accion='ambiguo', requiere_atencion=True y candidatos[] contiene los registros similares. "
+        "El Agente 4 usa este endpoint antes de vincular un asegurado a un trámite. "
+        "El analista también puede usarlo desde la UI para evitar duplicados manuales."
+    ),
+)
+async def buscar_o_crear_asegurado(
+    body: AseguradoBuscarOCrearBody,
+    usuario: UsuarioToken = Depends(get_current_user),
+    admin=Depends(get_admin_db_dep),
+) -> AseguradoBuscarOCrearResponse:
+    result = admin.rpc(
+        "buscar_o_crear_asegurado",
+        {
+            "p_nombre":            body.nombre,
+            "p_rfc":               body.rfc,
+            "p_curp":              body.curp,
+            "p_tipo":              body.tipo.value if body.tipo else None,
+            "p_fecha_nacimiento":  body.fecha_nacimiento.isoformat() if body.fecha_nacimiento else None,
+            "p_datos_adicionales": body.datos_adicionales or {},
+            "p_similitud_minima":  body.similitud_minima,
+        },
+    ).execute()
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error_code": "ERROR_DEDUP", "mensaje": "La función de deduplicación no retornó resultado."},
+        )
+
+    data: dict = result.data if isinstance(result.data, dict) else result.data[0]
+
+    asegurado_id = data.get("asegurado_id")
+    accion = data.get("accion", "")
+    requiere_atencion = data.get("requiere_atencion", False)
+    candidatos_raw: list[dict] = data.get("candidatos") or []
+
+    candidatos = [CandidatoAsegurado.model_validate(c) for c in candidatos_raw]
+
+    asegurado_detail: AseguradoResponse | None = None
+    if asegurado_id:
+        db = get_user_db(usuario.access_token)
+        aseg = db.table("asegurado").select("*").eq("id", str(asegurado_id)).maybe_single().execute()
+        if aseg.data:
+            asegurado_detail = AseguradoResponse.model_validate(aseg.data)
+
+    log.info(
+        "asegurado_dedup",
+        accion=accion,
+        asegurado_id=str(asegurado_id) if asegurado_id else None,
+        requiere_atencion=requiere_atencion,
+        n_candidatos=len(candidatos),
+        por=str(usuario.id),
+    )
+
+    return AseguradoBuscarOCrearResponse(
+        asegurado_id=asegurado_id,
+        accion=accion,
+        requiere_atencion=requiere_atencion,
+        candidatos=candidatos,
+        asegurado=asegurado_detail,
+    )
+
+
 @router.get("/asegurados/{asegurado_id}", response_model=AseguradoResponse)
 async def obtener_asegurado(
     asegurado_id: UUID,
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> AseguradoResponse:
     db = get_user_db(usuario.access_token)
-    result = db.table("asegurado").select("*").eq("id", str(asegurado_id)).execute()
+    result = db.table("asegurado").select("*").eq("id", str(asegurado_id)).maybe_single().execute()
     if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asegurado no encontrado.")
     return AseguradoResponse.model_validate(result.data)
@@ -264,8 +337,8 @@ async def obtener_poliza(
         .execute()
     )
 
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PÃ³liza no encontrada.")
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Póliza no encontrada.")
 
     return _armar_poliza_response(result.data)
 

@@ -76,20 +76,21 @@ def test_pipeline_schema_estados_estructura(client_analista):
     assert "estados_terminales" in data
     assert isinstance(data["estados"], list)
     assert isinstance(data["transiciones"], dict)
-    # Los terminales deben incluir aprobado y rechazado
-    assert "aprobado" in data["estados_terminales"]
-    assert "rechazado" in data["estados_terminales"]
+    # Los terminales deben incluir completado, rechazado_gnp y cancelado
+    assert "completado" in data["estados_terminales"]
+    assert "rechazado_gnp" in data["estados_terminales"]
+    assert "cancelado" in data["estados_terminales"]
     # Todos los estados conocidos están en la respuesta
     assert "recibido" in data["estados"]
-    assert "en_proceso_gnp" in data["estados"]
+    assert "en_revision" in data["estados"]
 
 
 def test_pipeline_schema_transiciones_coherentes(client_analista):
     """Las transiciones en el schema deben coincidir con el estado 'recibido'."""
     response = client_analista.get("/api/v1/pipeline/schema/estados")
     data = response.json()
-    assert data["transiciones"]["recibido"] == ["validando"]
-    assert data["transiciones"]["aprobado"] == []
+    assert data["transiciones"]["recibido"] == ["en_revision"]
+    assert data["transiciones"]["completado"] == []
 
 
 # ---------------------------------------------------------------------------

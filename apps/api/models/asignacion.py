@@ -5,7 +5,7 @@ Modelos Pydantic para asignaciones de agentes a analistas y coberturas de vacaci
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from models.usuario import RamoUsuario
 
@@ -33,6 +33,34 @@ class AsignacionResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class AsignacionUpdate(BaseModel):
+    analista_id: UUID | None = None
+    notas: str | None = Field(default=None, max_length=500)
+    activo: bool | None = None
+
+
+class BulkAsignacionCreate(BaseModel):
+    agente_ids: list[UUID] = Field(min_length=1, max_length=100)
+    ramo: RamoUsuario
+    analista_id: UUID
+    notas: str | None = Field(default=None, max_length=500)
+
+    @field_validator("agente_ids")
+    @classmethod
+    def no_duplicates(cls, v: list[UUID]) -> list[UUID]:
+        if len(v) != len(set(v)):
+            raise ValueError("La lista de agentes no puede contener duplicados.")
+        return v
+
+
+class BulkAsignacionResult(BaseModel):
+    total: int
+    creados: int
+    saltados: int
+    errores: int
+    detalle: list[str]
 
 
 class ResolverAsignacionResponse(BaseModel):

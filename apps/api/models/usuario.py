@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 class RolUsuario(StrEnum):
@@ -52,6 +52,7 @@ class UsuarioResponse(BaseModel):
     email: EmailStr
     rol: RolUsuario
     ramo: RamoUsuario | None
+    ramos_adicionales: list[RamoUsuario] | None
     telefono: str | None
     firma_html: str | None
     activo: bool
@@ -69,6 +70,7 @@ class UsuarioListItem(BaseModel):
     email: EmailStr
     rol: RolUsuario
     ramo: RamoUsuario | None
+    ramos_adicionales: list[RamoUsuario] | None
     activo: bool
 
     model_config = {"from_attributes": True}
@@ -77,15 +79,20 @@ class UsuarioListItem(BaseModel):
 class UsuarioCreate(BaseModel):
     """
     Payload para crear un nuevo usuario.
-    Solo directores pueden invocar este endpoint.
+    La jerarquía de roles permitidos se valida en el router (depende del rol del caller).
     La creación ocurre en Supabase Auth Admin API; el trigger sync_auth_usuario
     crea automáticamente el perfil en public.usuario.
     """
 
     nombre: str = Field(min_length=2, max_length=100)
     email: EmailStr
+    password: str = Field(
+        min_length=12,
+        description="Contraseña inicial. Compartirla de forma segura con el nuevo usuario.",
+    )
     rol: RolUsuario
     ramo: RamoUsuario | None = None
+    ramos_adicionales: list[RamoUsuario] | None = None
     telefono: str | None = Field(
         default=None,
         max_length=20,
@@ -93,12 +100,41 @@ class UsuarioCreate(BaseModel):
     )
     firma_html: str | None = Field(default=None, max_length=5000)
 
+    @field_validator("ramo", mode="before")
+    @classmethod
+    def coerce_ramo(cls, v):
+        if isinstance(v, str):
+            try:
+                return RamoUsuario(v)
+            except ValueError:
+                return v
+        return v
+
+    @field_validator("ramos_adicionales", mode="before")
+    @classmethod
+    def coerce_ramos_adicionales(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return [RamoUsuario(r) if isinstance(r, str) else r for r in v]
+        return v
+
     @model_validator(mode="after")
     def validar_ramo_segun_rol(self) -> "UsuarioCreate":
         if self.rol in (RolUsuario.gerente, RolUsuario.analista) and self.ramo is None:
-            raise ValueError(f"El rol '{self.rol}' requiere un ramo.")
+            raise ValueError(f"El rol '{self.rol}' requiere al menos un ramo principal.")
         if self.rol in (RolUsuario.director_general, RolUsuario.director_ops) and self.ramo is not None:
             raise ValueError(f"El rol '{self.rol}' no puede tener ramo asignado.")
+        return self
+
+    @model_validator(mode="after")
+    def validar_ramos_adicionales(self) -> "UsuarioCreate":
+        if self.ramos_adicionales:
+            duplicados = len(self.ramos_adicionales) != len(set(self.ramos_adicionales))
+            if duplicados:
+                raise ValueError("No puede haber ramos duplicados en ramos_adicionales.")
+            if self.ramo and self.ramo in self.ramos_adicionales:
+                raise ValueError(f"El ramo '{self.ramo.value}' ya está como ramo principal.")
         return self
 
 
@@ -135,3 +171,12 @@ class UsuarioAdminUpdate(BaseModel):
     )
     firma_html: str | None = Field(default=None, max_length=5000)
     activo: bool | None = None
+    ramos_adicionales: list[RamoUsuario] | None = None
+
+    @model_validator(mode="after")
+    def validar_ramos_adicionales(self) -> "UsuarioAdminUpdate":
+        if self.ramos_adicionales is not None:
+            duplicados = len(self.ramos_adicionales) != len(set(self.ramos_adicionales))
+            if duplicados:
+                raise ValueError("No puede haber ramos duplicados en ramos_adicionales.")
+        return self

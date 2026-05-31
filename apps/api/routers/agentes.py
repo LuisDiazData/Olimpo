@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router del catÃ¡logo de agentes de seguros.
 
 GET    /agentes                             â€” listado con bÃºsqueda y filtros
@@ -20,25 +20,36 @@ PATCH  /agentes/{id}/asistentes/{asist_id}  â€” actualizar asistente
 """
 
 from uuid import UUID
+from datetime import date
+from io import BytesIO
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from supabase import Client
 
 from core.auth import get_current_user, require_roles
-from core.database import get_db
+from core.database import get_db, get_admin_db
 from models.agente import (
     AgenteCreate,
     AgenteEmailCreate,
     AgenteEmailResponse,
+    AgenteImportRow,
     AgenteListItem,
     AgenteResponse,
     AgenteUpdate,
     AsistenteCreate,
     AsistenteResponse,
     AsistenteUpdate,
+    ImportPreviewItem,
+    ImportResultItem,
+    ImportResponse,
     TelefonoCreate,
     TelefonoResponse,
+    TipoTelefono,
 )
 from models.usuario import RolUsuario, UsuarioToken
 
@@ -52,7 +63,7 @@ _ESCRITURA = [
 
 def _check_agente_existe(db: Client, agente_id: UUID) -> dict:
     result = db.table("agente").select("id, activo").eq("id", str(agente_id)).maybe_single().execute()
-    if not result:
+    if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agente no encontrado.")
     return result.data
 
@@ -113,7 +124,7 @@ def crear_agente(
     try:
         result = (
             db.table("agente")
-            .insert(body.model_dump(exclude_none=True))
+            .insert(body.model_dump(mode="json", exclude_none=True))
             .select("id, cua, nombre, nombre_comercial, rfc, fecha_afiliacion, notas, activo, created_at, updated_at")
             .execute()
         )
@@ -139,6 +150,80 @@ def crear_agente(
 
 
 # ---------------------------------------------------------------------------
+# GET /agentes/template — descarga plana Excel con columnas requeridas
+# ---------------------------------------------------------------------------
+
+@router.get("/template", dependencies=[Depends(get_current_user)])
+def descargar_template():
+    """Genera un archivo Excel en blanco con los encabezados correctos."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Agentes"
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="1E293B")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+
+    headers = [
+        "CUA *",
+        "Nombre completo *",
+        "Nombre comercial",
+        "RFC",
+        "Fecha de afiliación (YYYY-MM-DD)",
+        "Correo electrónico",
+        "Teléfono",
+        "Tipo de teléfono (celular/oficina/casa/whatsapp/otro)",
+        "Notas",
+    ]
+
+    for col, h in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+
+    example_rows = [
+        ["A000123456", "Juan Pérez García", "Agencia JP", "PEGJ800101ABC", "2020-01-15", "juan@email.com", "55 1234 5678", "celular", "Agente con 5 años de experiencia"],
+        ["A000234567", "María López Hernández", "Seguros ML", "LOPM850202XYZ", "2019-06-01", "maria@email.com", "55 8765 4321", "whatsapp", ""],
+    ]
+
+    example_fill = PatternFill("solid", fgColor="F8FAFC")
+    for r, row_data in enumerate(example_rows, start=2):
+        for c, val in enumerate(row_data, start=1):
+            cell = ws.cell(row=r, column=c, value=val)
+            cell.fill = example_fill
+            cell.border = thin_border
+            if c == 1:
+                cell.font = Font(bold=True)
+
+    col_widths = [20, 35, 25, 15, 28, 30, 18, 30, 40]
+    for i, w in enumerate(col_widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws.row_dimensions[1].height = 30
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=olimpo_agentes_template.xlsx",
+            "Content-Length": str(buffer.getbuffer().nbytes),
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # GET /agentes/{id}
 # ---------------------------------------------------------------------------
 
@@ -151,16 +236,16 @@ def obtener_agente(
         db.table("agente")
         .select(
             "id, cua, nombre, nombre_comercial, rfc, fecha_afiliacion, notas, activo, created_at, updated_at, "
-            "agente_telefono(id, agente_id, tipo, numero, preferente, created_at), "
-            "agente_email(id, agente_id, email, preferente, created_at), "
-            "asistente(id, agente_id, nombre, email, telefono, activo, created_at, updated_at)"
+            "agente_telefono!left(id, agente_id, tipo, numero, preferente, created_at), "
+            "agente_email!left(id, agente_id, email, preferente, created_at), "
+            "asistente!asistente_agente_id_fkey!left(id, agente_id, nombre, email, telefono, activo, created_at, updated_at)"
         )
         .eq("id", str(agente_id))
         .maybe_single()
         .execute()
     )
 
-    if not result:
+    if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agente no encontrado.")
 
     data = result.data
@@ -395,4 +480,206 @@ def actualizar_asistente(
     if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asistente no encontrado.")
     return AsistenteResponse.model_validate(result.data)
+
+
+@router.delete("/{agente_id}/asistentes/{asistente_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_ESCRITURA)
+def eliminar_asistente(
+    agente_id: UUID,
+    asistente_id: UUID,
+    db: Client = Depends(get_db),
+) -> None:
+    db.table("asistente").delete().eq("id", str(asistente_id)).eq("agente_id", str(agente_id)).execute()
+
+
+# ---------------------------------------------------------------------------
+# POST /agentes/import
+# ---------------------------------------------------------------------------
+
+@router.post("/import", response_model=ImportResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(get_current_user)] + _ESCRITURA)
+async def importar_agentes(
+    file: UploadFile = File(...),
+    db: Client = Depends(get_db),
+):
+    """
+    Recibe un archivo Excel (.xlsx), valida cada fila contra AgenteImportRow,
+    detecta CUA duplicados en el propio archivo, consulta cuáles ya existen
+    en la DB (por CUA) y hace INSERT en batch o individual con errores capturados.
+
+    Retorna el detalle de cada fila: éxito, id generado o error.
+    """
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Formato no soportado. Usa un archivo .xlsx o .xls",
+        )
+
+    contents = await file.read()
+    try:
+        wb = load_workbook(BytesIO(contents), data_only=True)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se pudo leer el archivo Excel.")
+
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+
+    if len(rows) < 2:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="El archivo no contiene filas de datos.")
+
+    header_row = [str(c).strip() if c is not None else "" for c in rows[0]]
+    col_map = {h.lower(): i for i, h in enumerate(header_row)}
+
+    required = {"cua": None, "nombre completo": None}
+    for key in required:
+        if key not in col_map:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Falta la columna requerida: '{key}'",
+            )
+
+    import_rows: list[AgenteImportRow] = []
+    preview_errors: list[tuple[int, str]] = []
+
+    for idx, row in enumerate(rows[1:], start=2):
+        def _col(key: str, default=None):
+            return row[col_map[key]] if key in col_map and col_map[key] < len(row) else default
+
+        raw = AgenteImportRow(
+            cua=str(_col("cua") or "").strip(),
+            nombre=str(_col("nombre completo") or "").strip(),
+            nombre_comercial=str(_col("nombre comercial") or "").strip() or None,
+            rfc=str(_col("rfc") or "").strip() or None,
+            fecha_afiliacion=str(_col("fecha de afiliación (yyyy-mm-dd)") or "").strip() or None,
+            email=str(_col("correo electrónico") or "").strip() or None,
+            telefono=str(_col("teléfono") or "").strip() or None,
+            tipo_telefono=str(_col("tipo de teléfono (celular/oficina/casa/whatsapp/otro)") or "").strip() or None,
+            notas=str(_col("notas") or "").strip() or None,
+        )
+
+        row_errors = []
+        if not raw.cua:
+            row_errors.append("CUA es requerido")
+        if not raw.nombre or len(raw.nombre) < 2:
+            row_errors.append("Nombre es requerido (mínimo 2 caracteres)")
+
+        if raw.fecha_afiliacion:
+            try:
+                date.fromisoformat(raw.fecha_afiliacion)
+            except ValueError:
+                row_errors.append(f"Fecha de afiliación inválida: '{raw.fecha_afiliacion}' — usar formato YYYY-MM-DD")
+                raw.fecha_afiliacion = None
+
+        if raw.tipo_telefono and raw.tipo_telefono not in {t.value for t in TipoTelefono}:
+            row_errors.append(f"Tipo de teléfono desconocido: '{raw.tipo_telefono}'")
+
+        if row_errors:
+            preview_errors.append((idx, "; ".join(row_errors)))
+        else:
+            import_rows.append(raw)
+
+    if not import_rows:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No se encontraron filas válidas para importar. " + "; ".join(f"Fila {r}: {e}" for r, e in preview_errors),
+        )
+
+    cuas = [r.cua for r in import_rows]
+    if len(cuas) != len(set(cuas)):
+        dupes = [c for c in cuas if cuas.count(c) > 1]
+        seen: set[str] = set()
+        for d in dupes:
+            if d not in seen:
+                seen.add(d)
+                preview_errors.append((-1, f"CUA duplicado en el archivo: '{d}'"))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El archivo contiene CUA duplicados: " + ", ".join(sorted(seen)),
+        )
+
+    admin_db = get_admin_db()
+
+    existing: dict[str, dict] = {}
+    if cuas:
+        res = admin_db.table("agente").select("id, cua").in_("cua", cuas).execute()
+        for r in (res.data or []):
+            existing[r["cua"]] = r
+
+    results: list[ImportResultItem] = []
+    exitosos = 0
+    fallidos = 0
+    errores_duplicados = 0
+
+    for idx, row_data in enumerate(import_rows, start=2):
+        cua = row_data.cua
+
+        if cua in existing:
+            errores_duplicados += 1
+            results.append(ImportResultItem(row=idx, cua=cua, success=False, error="Ya existe un agente con este CUA"))
+            continue
+
+        try:
+            insert_payload: dict = {
+                "cua": cua,
+                "nombre": row_data.nombre,
+                "nombre_comercial": row_data.nombre_comercial,
+                "rfc": row_data.rfc,
+                "notas": row_data.notas,
+            }
+            if row_data.fecha_afiliacion:
+                insert_payload["fecha_afiliacion"] = row_data.fecha_afiliacion
+
+            ins = admin_db.table("agente").insert(insert_payload).execute()
+            if not ins.data:
+                raise Exception("No se devolvió id")
+
+            created = ins.data[0]
+            agente_id: str = created["id"]
+
+            if row_data.email:
+                try:
+                    admin_db.table("agente_email").insert({
+                        "agente_id": agente_id,
+                        "email": row_data.email,
+                        "preferente": True,
+                    }).execute()
+                except Exception:
+                    pass
+
+            if row_data.telefono:
+                try:
+                    admin_db.table("agente_telefono").insert({
+                        "agente_id": agente_id,
+                        "numero": row_data.telefono,
+                        "tipo": row_data.tipo_telefono or TipoTelefono.celular.value,
+                        "preferente": True,
+                    }).execute()
+                except Exception:
+                    pass
+
+            exitosos += 1
+            results.append(ImportResultItem(row=idx, cua=cua, success=True, agente_id=agente_id))
+            existing[cua] = {"id": agente_id}
+
+        except Exception as exc:
+            fallidos += 1
+            results.append(ImportResultItem(row=idx, cua=cua, success=False, error=str(exc)))
+
+    detalle_parts = []
+    if exitosos:
+        detalle_parts.append(f"{exitosos} agente(s) importado(s) correctamente")
+    if errores_duplicados:
+        detalle_parts.append(f"{errores_duplicados} skipped por CUA duplicado")
+    if fallidos:
+        detalle_parts.append(f"{fallidos} fallido(s)")
+    detalle = "; ".join(detalle_parts) or "Sin resultados"
+
+    log.info("agentes_importados", total=len(import_rows), exitosos=exitosos, fallidos=fallidos, errores_duplicados=errores_duplicados)
+
+    return ImportResponse(
+        total=len(import_rows),
+        exitosos=exitosos,
+        fallidos=fallidos,
+        errores_duplicados=errores_duplicados,
+        results=results,
+        detalle=detalle,
+    )
 

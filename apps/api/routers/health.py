@@ -46,7 +46,7 @@ def get_me(
         .execute()
     )
 
-    if not result:
+    if not result.data:
         log.warning("perfil_no_encontrado", usuario_id=str(usuario.id))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
