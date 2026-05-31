@@ -426,7 +426,7 @@ async def crear_dia_inhabil(
                         f"con el mismo ramo ({body.aplica_ramo or 'global'})."
                     ),
                 },
-            )
+            ) from exc
         raise
 
     if not result.data:

@@ -167,12 +167,12 @@ async def crear_asignacion(
                     "error_code": "ASIGNACION_DUPLICADA",
                     "mensaje": "Ya existe una asignaciÃ³n activa para este agente y ramo. Desactiva la anterior primero.",
                 },
-            )
+            ) from exc
         if "Solo se puede asignar un usuario con rol" in msg or "analista es del ramo" in msg:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail={"error_code": "VALIDACION_FALLO", "mensaje": msg},
-            )
+            ) from exc
         raise
 
     log.info("asignacion_creada", id=result.data["id"], agente=str(body.agente_id), ramo=body.ramo)

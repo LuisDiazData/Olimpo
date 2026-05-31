@@ -243,13 +243,13 @@ export function TramiteDetalleDrawer({ tramite, onClose, onTramiteUpdated }: Tra
       fetch(`/api/tramites/${tramite.id}/contactos`).then(r => r.json()).catch(() => ({ data: [] })),
       puedeReasignar
         ? api.get<AnalistaItem[]>("/usuarios?rol=analista&activo=true&limit=200")
-        : Promise.resolve({ data: [] }),
+        : Promise.resolve([] as AnalistaItem[]),
     ]).then(([ev, doc, com, cont, analy]) => {
       setEventos(ev.data ?? [])
       setDocumentos(doc.data ?? [])
       setComunicaciones(com.data ?? [])
       setContactos(cont.data ?? [])
-      setAnalistas(analy.data ?? [])
+      setAnalistas(analy ?? [])
       setLoading(false)
     })
   }, [tramite, puedeReasignar])

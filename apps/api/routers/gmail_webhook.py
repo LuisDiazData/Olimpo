@@ -267,7 +267,7 @@ async def renovar_canal_gmail(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="No se pudo encolar la renovación del canal.",
-        )
+        ) from exc
 
     log.info("canal_renovacion_encolada", email_address=email_address)
     return {"mensaje": f"Renovación del canal encolada para {email_address}."}

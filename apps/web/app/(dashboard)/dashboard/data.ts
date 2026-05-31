@@ -424,11 +424,11 @@ export async function getDashboardData(
 
   // Tiempo promedio de resolución
   const resueltosTiempo = (resueltosTiempoRes.data ?? []).filter(
-    (t) => t.fecha_recepcion && t.updated_at
+    (t: Record<string, unknown>) => t.fecha_recepcion && t.updated_at
   )
   let tiempoPromedioDias: number | null = null
   if (resueltosTiempo.length > 0) {
-    const totalMs = resueltosTiempo.reduce((acc, t) => {
+    const totalMs = resueltosTiempo.reduce((acc: number, t: Record<string, unknown>) => {
       return acc + (new Date(t.updated_at as string).getTime() - new Date(t.fecha_recepcion as string).getTime())
     }, 0)
     tiempoPromedioDias = Math.round((totalMs / resueltosTiempo.length) / (1000 * 60 * 60 * 24) * 10) / 10
@@ -585,7 +585,7 @@ export async function getDashboardData(
 
   // ── Tramites sin movimiento > 5 días ───────────────────────────────────────
 
-  const tramitesEstancados: StalledTramite[] = (estancadosRes.data ?? []).map((t) => {
+  const tramitesEstancados: StalledTramite[] = (estancadosRes.data ?? []).map((t: Record<string, unknown>) => {
     const dias = Math.floor(
       (ahoraMs - new Date(t.ultima_actividad as string).getTime()) / (1000 * 60 * 60 * 24)
     )
@@ -603,9 +603,9 @@ export async function getDashboardData(
 
   // ── Aggregations ───────────────────────────────────────────────────────────
 
-  const estadoMap = contarPorCampo(estadosRes.data ?? ([] as Record<string, unknown>), "estado")
-  const ramoMap = contarPorCampo(ramoRes.data ?? ([] as Record<string, unknown>), "ramo")
-  const tipoMap = contarPorCampo(tipoRes.data ?? ([] as Record<string, unknown>), "tipo_tramite")
+  const estadoMap = contarPorCampo(estadosRes.data ?? ([] as Record<string, unknown>[]), "estado")
+  const ramoMap = contarPorCampo(ramoRes.data ?? ([] as Record<string, unknown>[]), "ramo")
+  const tipoMap = contarPorCampo(tipoRes.data ?? ([] as Record<string, unknown>[]), "tipo_tramite")
   const slaMap = contarPorCampo(slaRows as Record<string, unknown>[], "estado")
 
   const porEstado: EstadoCount[] = Object.entries(estadoMap).map(([estado, count]) => ({
@@ -627,8 +627,8 @@ export async function getDashboardData(
     count,
   }))
 
-  const entradas = (entradasRes.data ?? []).map((t) => t.fecha_recepcion as string)
-  const resueltosTendencia = (resueltosRes.data ?? []).map((t) => t.updated_at as string)
+  const entradas = (entradasRes.data ?? []).map((t: Record<string, unknown>) => t.fecha_recepcion as string)
+  const resueltosTendencia = (resueltosRes.data ?? []).map((t: Record<string, unknown>) => t.updated_at as string)
   const tendencia = agruparPorSemana(entradas, resueltosTendencia, 8)
 
   // ── Carga por analista ───────────────────────────────────────────────────
@@ -671,7 +671,7 @@ export async function getDashboardData(
   // ── Alertas ──────────────────────────────────────────────────────────────
 
   const alertasRaw = alertasRes.data ?? []
-  const alertas: AlertaTramite[] = alertasRaw.map((t) => ({
+  const alertas: AlertaTramite[] = alertasRaw.map((t: Record<string, unknown>) => ({
     id: t.id as string,
     folio: t.folio as string,
     titulo: t.titulo as string,

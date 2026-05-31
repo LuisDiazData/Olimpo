@@ -368,7 +368,7 @@ async def vincular_correo_tramite(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Este correo ya estÃ¡ vinculado a este trÃ¡mite.",
-            )
+            ) from exc
         raise
 
     return CorreoTramiteVinculo.model_validate(result.data)

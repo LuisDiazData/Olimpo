@@ -147,12 +147,12 @@ def crear_usuario(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"El correo '{body.email}' ya está registrado.",
-            )
+            ) from exc
         log.error("error_crear_usuario_auth", email=str(body.email), error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Error al crear el usuario en Auth: {exc}",
-        )
+        ) from exc
 
     # El trigger de la DB ya insertÃ³ el perfil â€" lo leemos con service_role
     result = (
@@ -381,7 +381,7 @@ def enviar_reset_password(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="No se pudo enviar el correo de recuperación. Intenta de nuevo.",
-        )
+        ) from exc
 
     log.info("reset_password_enviado", usuario_id=str(usuario_id), email=result.data["email"])
     return {"mensaje": "Enlace de recuperación enviado al correo del usuario."}

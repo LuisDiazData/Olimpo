@@ -108,9 +108,9 @@ async def crear_asegurado(
     except Exception as exc:
         msg = str(exc)
         if "uq_asegurado_rfc" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un asegurado con RFC '{body.rfc}'.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un asegurado con RFC '{body.rfc}'.") from exc
         if "uq_asegurado_curp" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un asegurado con CURP '{body.curp}'.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Ya existe un asegurado con CURP '{body.curp}'.") from exc
         raise
 
     return AseguradoResponse.model_validate(result.data)
@@ -223,9 +223,9 @@ async def actualizar_asegurado(
     except Exception as exc:
         msg = str(exc)
         if "uq_asegurado_rfc" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="RFC ya registrado.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="RFC ya registrado.") from exc
         if "uq_asegurado_curp" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CURP ya registrado.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CURP ya registrado.") from exc
         raise
 
     if not result.data:
@@ -311,7 +311,7 @@ async def crear_poliza(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Ya existe una pÃ³liza con nÃºmero '{body.numero_poliza}'.",
-            )
+            ) from exc
         raise
 
     return _armar_poliza_response(result.data)
@@ -406,9 +406,9 @@ async def vincular_asegurado(
     except Exception as exc:
         msg = str(exc)
         if "uq_poliza_titular" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta pÃ³liza ya tiene un titular.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta pÃ³liza ya tiene un titular.") from exc
         if "uq_poliza_asegurado" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este asegurado ya estÃ¡ vinculado a esta pÃ³liza.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este asegurado ya estÃ¡ vinculado a esta pÃ³liza.") from exc
         raise
 
     data = result.data

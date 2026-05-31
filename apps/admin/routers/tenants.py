@@ -150,7 +150,7 @@ async def _validar_conectividad_tenant(supabase_url: str, service_role_key: str)
                                    "Verifica que el proyecto exista y esté activo.",
                     },
                 )
-    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError):
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
@@ -158,7 +158,7 @@ async def _validar_conectividad_tenant(supabase_url: str, service_role_key: str)
                 "mensaje": "No se pudo conectar al proyecto Supabase del tenant. "
                            "Verifica que la URL sea correcta y el proyecto esté activo.",
             },
-        )
+        ) from exc
 
 
 # =============================================================================
@@ -216,12 +216,12 @@ async def crear_tenant(body: TenantCreate):
                     "error_code": "SUBDOMINIO_DUPLICADO",
                     "mensaje": f"Ya existe un tenant con el subdominio '{body.subdominio}'.",
                 },
-            )
+            ) from exc
         log.error("error_crear_tenant", error=msg)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error_code": "ERROR_DB", "mensaje": "Error al registrar el tenant."},
-        )
+        ) from exc
 
     log.info("tenant_creado", subdominio=body.subdominio, nombre=body.nombre)
     return result.data[0]

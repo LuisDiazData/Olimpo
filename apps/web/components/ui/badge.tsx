@@ -11,6 +11,7 @@ type BadgeVariant =
   | "purple"
   | "red"
   | "rose"
+  | "pink"
   | "teal"
   | "orange"
 
@@ -25,6 +26,7 @@ const styles: Record<BadgeVariant, string> = {
   purple:  "bg-purple-100  text-purple-700",
   red:     "bg-red-100     text-red-700",
   rose:    "bg-rose-100    text-rose-700",
+  pink:    "bg-pink-100    text-pink-700",
   teal:    "bg-teal-100    text-teal-700",
   orange:  "bg-orange-100  text-orange-700",
 }

@@ -141,7 +141,7 @@ def crear_usuario_maestro(tenant_id: UUID, body: UsuarioMaestroCreate):
                     "error_code": "EMAIL_DUPLICADO",
                     "mensaje": f"Ya existe un usuario con el email '{body.email}' en este tenant.",
                 },
-            )
+            ) from exc
         log.error("error_crear_usuario_maestro", tenant_id=str(tenant_id), error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -149,7 +149,7 @@ def crear_usuario_maestro(tenant_id: UUID, body: UsuarioMaestroCreate):
                 "error_code": "ERROR_SUPABASE_AUTH",
                 "mensaje": f"Error al crear el usuario en Supabase Auth: {exc}",
             },
-        )
+        ) from exc
 
     usuario = response.user
     if usuario is None:
@@ -214,7 +214,7 @@ def resetear_password(tenant_id: UUID, body: ResetPasswordBody):
                 "error_code": "ERROR_SUPABASE_AUTH",
                 "mensaje": f"Error al actualizar la contraseña: {exc}",
             },
-        )
+        ) from exc
 
     log.info(
         "password_reseteada",
@@ -266,7 +266,7 @@ def bloquear_usuario_maestro(tenant_id: UUID):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={"error_code": "ERROR_SUPABASE_AUTH", "mensaje": str(exc)},
-        )
+        ) from exc
 
     # Soft-block en public.usuario — el CRM también lo ve inactivo
     try:
@@ -318,7 +318,7 @@ def desbloquear_usuario_maestro(tenant_id: UUID):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={"error_code": "ERROR_SUPABASE_AUTH", "mensaje": str(exc)},
-        )
+        ) from exc
 
     try:
         tenant_client.table("usuario").update({"activo": True}).eq(

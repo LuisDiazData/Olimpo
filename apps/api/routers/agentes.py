@@ -135,12 +135,12 @@ def crear_agente(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Ya existe un agente con CUA '{body.cua}'.",
-            )
+            ) from exc
         if "uq_agente_rfc" in str(exc):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Ya existe un agente con RFC '{body.rfc}'.",
-            )
+            ) from exc
         raise exc from None
 
     data = result.data
@@ -280,7 +280,7 @@ def actualizar_agente(
         db.table("agente").update(cambios).eq("id", str(agente_id)).execute()
     except Exception as exc:
         if "uq_agente_rfc" in str(exc):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="RFC ya registrado en otro agente.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="RFC ya registrado en otro agente.") from exc
         raise exc from None
 
     return obtener_agente(agente_id, db)
@@ -384,9 +384,9 @@ def agregar_email(
     except Exception as exc:
         msg = str(exc)
         if "uq_agente_email_email" in msg or "duplicate" in msg.lower():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"El correo '{body.email}' ya estÃ¡ registrado.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"El correo '{body.email}' ya estÃ¡ registrado.") from exc
         if "ya estÃ¡ registrado como email de un asistente" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         raise exc from None
 
     return AgenteEmailResponse.model_validate(result.data)
@@ -447,9 +447,9 @@ def agregar_asistente(
     except Exception as exc:
         msg = str(exc)
         if "uq_asistente_email" in msg or "duplicate" in msg.lower():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"El correo '{body.email}' ya estÃ¡ registrado como asistente.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"El correo '{body.email}' ya estÃ¡ registrado como asistente.") from exc
         if "ya estÃ¡ registrado como email de un agente" in msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         raise exc from None
 
     return AsistenteResponse.model_validate(result.data)
@@ -516,8 +516,8 @@ async def importar_agentes(
     contents = await file.read()
     try:
         wb = load_workbook(BytesIO(contents), data_only=True)
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se pudo leer el archivo Excel.")
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se pudo leer el archivo Excel.") from exc
 
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))

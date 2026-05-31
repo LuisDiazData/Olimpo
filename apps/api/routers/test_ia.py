@@ -53,7 +53,7 @@ async def test_completion(body: CompletionTestRequest):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Fallo en la comunicación con el LLM: {str(e)}"
-        )
+        ) from e
 
 
 @router.post(
@@ -74,7 +74,7 @@ async def test_embedding(body: EmbeddingTestRequest):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Fallo al generar el embedding: {str(e)}"
-        )
+        ) from e
 
 
 @router.post(
@@ -109,4 +109,4 @@ async def test_ocr(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Fallo al procesar el OCR: {str(e)}"
-        )
+        ) from e

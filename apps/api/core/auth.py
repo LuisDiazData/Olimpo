@@ -139,18 +139,18 @@ def _decode_jwt(token: str) -> dict:
             audience="authenticated",
             options={"require": ["sub", "exp", "aud"]},
         )
-    except jwt.ExpiredSignatureError:
+    except jwt.ExpiredSignatureError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sesión expirada. Inicia sesión nuevamente.",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
     except jwt.InvalidTokenError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token inválido: {exc}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
 
 
 def get_current_user(
@@ -175,21 +175,21 @@ def get_current_user(
 
     try:
         rol = RolUsuario(rol_raw)
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Rol desconocido en token: '{rol_raw}'",
-        )
+        ) from exc
 
     ramo: RamoUsuario | None = None
     if ramo_raw is not None:
         try:
             ramo = RamoUsuario(ramo_raw)
-        except ValueError:
+        except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Ramo desconocido en token: '{ramo_raw}'",
-            )
+            ) from exc
 
     return UsuarioToken(
         id=UUID(payload["sub"]),
@@ -264,14 +264,14 @@ def get_agent_token(
 
     try:
         rol = RolUsuario(key_data["rol"])
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error_code": "ROL_INVALIDO",
                 "mensaje": f"La API key tiene un rol inválido: '{key_data['rol']}'",
             },
-        )
+        ) from exc
 
     ramo: RamoUsuario | None = None
     if key_data.get("ramo"):

@@ -223,7 +223,7 @@ export default async function DashboardPage() {
             description="Veces completado vs rechazado"
             accent={
               kpis.ratioCompletadoRechazo == null
-                ? "neutral"
+                ? undefined
                 : kpis.ratioCompletadoRechazo >= 3
                 ? "green"
                 : kpis.ratioCompletadoRechazo >= 1.5
