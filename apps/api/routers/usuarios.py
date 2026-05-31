@@ -11,6 +11,7 @@ La creaciÃ³n de usuario pasa por Supabase Auth Admin API (service_role).
 El trigger sync_auth_usuario en la DB crea el perfil en public.usuario.
 """
 
+from typing import Any, cast
 from uuid import UUID
 
 import structlog
@@ -194,8 +195,9 @@ def crear_usuario(
             {"ramos_adicionales": [r.value for r in body.ramos_adicionales]}
         ).eq("id", auth_response.user.id).execute()
 
-    log.info("usuario_creado", id=result.data["id"], email=body.email, rol=body.rol)
-    return UsuarioResponse.model_validate(result.data)
+    perfil = cast(dict[str, Any], result.data)
+    log.info("usuario_creado", id=perfil["id"], email=body.email, rol=body.rol)
+    return UsuarioResponse.model_validate(perfil)
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +230,7 @@ def obtener_usuario(
             detail="Usuario no encontrado.",
         )
 
-    return UsuarioResponse.model_validate(result.data)
+    return UsuarioResponse.model_validate(cast(dict[str, Any], result.data))
 
 
 # ---------------------------------------------------------------------------
@@ -273,10 +275,9 @@ def actualizar_usuario(
         )
         .execute()
     )
-    if result.data:
-        result.data = result.data[0]
+    row: dict[str, Any] | None = result.data[0] if result.data else None
 
-    if not result.data:
+    if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario no encontrado.",
@@ -329,12 +330,13 @@ def desactivar_usuario(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado."
             )
 
-        if objetivo.data["rol"] != RolUsuario.analista:
+        objetivo_data = cast(dict[str, Any], objetivo.data)
+        if objetivo_data["rol"] != RolUsuario.analista:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo puedes desactivar analistas.",
             )
-        if objetivo.data["ramo"] != caller.ramo:
+        if objetivo_data["ramo"] != caller.ramo:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Solo puedes desactivar analistas de tu ramo '{caller.ramo}'.",
@@ -387,7 +389,8 @@ def enviar_reset_password(
             detail="Usuario no encontrado.",
         )
 
-    if not result.data["activo"]:
+    usuario_data = cast(dict[str, Any], result.data)
+    if not usuario_data["activo"]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="El usuario está inactivo y no puede recuperar su contraseña.",
@@ -397,7 +400,7 @@ def enviar_reset_password(
         admin.auth.admin.generate_link(
             {
                 "type": "recovery",
-                "email": result.data["email"],
+                "email": usuario_data["email"],
             }
         )
     except AuthApiError as exc:
@@ -407,5 +410,5 @@ def enviar_reset_password(
             detail="No se pudo enviar el correo de recuperación. Intenta de nuevo.",
         ) from exc
 
-    log.info("reset_password_enviado", usuario_id=str(usuario_id), email=result.data["email"])
+    log.info("reset_password_enviado", usuario_id=str(usuario_id), email=usuario_data["email"])
     return {"mensaje": "Enlace de recuperación enviado al correo del usuario."}
