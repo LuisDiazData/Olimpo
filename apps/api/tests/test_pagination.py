@@ -3,6 +3,7 @@ Tests de PaginatedResponse — Capa 1 (sin DB).
 
 Verifica la lógica de has_more, campos requeridos y compatibilidad con tipos genéricos.
 """
+
 from models.pagination import PaginatedResponse
 from models.tramite import TramiteListItem
 
@@ -63,8 +64,6 @@ class TestPaginatedResponseBuild:
 
     def test_compatible_como_response_model_con_tipo_concreto(self):
         # Verificar que PaginatedResponse[TramiteListItem] es instanciable
-        result = PaginatedResponse[TramiteListItem].build(
-            items=[], total=0, offset=0, limit=50
-        )
+        result = PaginatedResponse[TramiteListItem].build(items=[], total=0, offset=0, limit=50)
         assert result.total == 0
         assert result.items == []

@@ -13,10 +13,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
 
 class EstadoTramite(StrEnum):
     recibido = "recibido"
@@ -111,9 +111,9 @@ TRANSICIONES_VALIDAS: dict[EstadoTramite, list[EstadoTramite]] = {
         EstadoTramite.complemento_en_revision,
         EstadoTramite.cancelado,
     ],
-    EstadoTramite.completado: [],    # terminal
-    EstadoTramite.rechazado_gnp: [], # terminal
-    EstadoTramite.cancelado: [],     # terminal
+    EstadoTramite.completado: [],  # terminal
+    EstadoTramite.rechazado_gnp: [],  # terminal
+    EstadoTramite.cancelado: [],  # terminal
 }
 
 
@@ -121,13 +121,14 @@ TRANSICIONES_VALIDAS: dict[EstadoTramite, list[EstadoTramite]] = {
 # Tramite — modelos de entrada
 # ---------------------------------------------------------------------------
 
+
 class TramiteCreate(BaseModel):
     tipo_tramite: TipoTramite
     titulo: str = Field(min_length=3, max_length=200)
     descripcion: str | None = Field(default=None, max_length=2000)
     canal_origen: CanalOrigenTramite = CanalOrigenTramite.manual
     prioridad: PrioridadTramite = PrioridadTramite.normal
-    ramo: str | None = None          # se hereda del analista si queda NULL
+    ramo: str | None = None  # se hereda del analista si queda NULL
     agente_id: UUID | None = None
     poliza_id: UUID | None = None
     asegurado_id: UUID | None = None
@@ -153,7 +154,7 @@ class TramiteUpdate(BaseModel):
 class CambiarEstadoBody(BaseModel):
     estado_nuevo: EstadoTramite = Field(
         description="Estado destino. Debe ser una transición válida desde el estado actual. "
-                    "Consultar el campo 'transiciones_disponibles' en GET /tramites/{id}."
+        "Consultar el campo 'transiciones_disponibles' en GET /tramites/{id}."
     )
     motivo_rechazo_gnp: str | None = Field(
         default=None,
@@ -178,9 +179,7 @@ class ReasignacionMasivaBody(BaseModel):
     analista_origen_id: UUID = Field(
         description="Analista cuyos trámites se van a reasignar (p. ej., el que está de vacaciones)."
     )
-    analista_destino_id: UUID = Field(
-        description="Analista que recibirá los trámites."
-    )
+    analista_destino_id: UUID = Field(description="Analista que recibirá los trámites.")
     motivo: str | None = Field(
         default=None,
         max_length=500,
@@ -220,6 +219,7 @@ class AgregarNotaBody(BaseModel):
 # ---------------------------------------------------------------------------
 # Tramite — modelos de respuesta
 # ---------------------------------------------------------------------------
+
 
 class TramiteListItem(BaseModel):
     """Vista compacta para dashboards y listados."""
@@ -302,7 +302,7 @@ class TramiteResponse(BaseModel):
     transiciones_disponibles: list[str] = Field(
         default_factory=list,
         description="Estados a los que puede transicionar este trámite desde su estado actual. "
-                    "Vacío si está en un estado terminal (completado, rechazado_gnp, cancelado)."
+        "Vacío si está en un estado terminal (completado, rechazado_gnp, cancelado).",
     )
 
     model_config = {"from_attributes": True}
@@ -311,6 +311,7 @@ class TramiteResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Tramite Evento — modelos
 # ---------------------------------------------------------------------------
+
 
 class ContactoTramiteResponse(BaseModel):
     """Persona involucrada en el trámite (agente, analista, gerente, asistente)."""

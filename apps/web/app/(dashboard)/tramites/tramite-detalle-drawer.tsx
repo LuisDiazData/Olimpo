@@ -18,7 +18,6 @@ import {
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { useUser } from "@/components/providers/user-provider"
-import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api"
 import { ReasignarTramiteModal } from "@/components/asignaciones/reasignar-tramite-modal"
 import { ESTADO_BADGE, TIPO_BADGE, PRIORIDAD_BADGE, RAMO_BADGE, formatFechaCorta } from "./shared"
@@ -242,8 +241,8 @@ export function TramiteDetalleDrawer({ tramite, onClose, onTramiteUpdated }: Tra
       fetch(`/api/tramites/${tramite.id}/comunicaciones`).then(r => r.json()).catch(() => ({ data: [] })),
       fetch(`/api/tramites/${tramite.id}/contactos`).then(r => r.json()).catch(() => ({ data: [] })),
       puedeReasignar
-        ? api.get<AnalistaItem[]>("/usuarios?rol=analista&activo=true&limit=200")
-        : Promise.resolve({ data: [] }),
+        ? api.get<AnalistaItem[]>("/usuarios?rol=analista&activo=true&limit=200").then((d) => ({ data: d }))
+        : Promise.resolve({ data: [] as AnalistaItem[] }),
     ]).then(([ev, doc, com, cont, analy]) => {
       setEventos(ev.data ?? [])
       setDocumentos(doc.data ?? [])
@@ -254,7 +253,7 @@ export function TramiteDetalleDrawer({ tramite, onClose, onTramiteUpdated }: Tra
     })
   }, [tramite, puedeReasignar])
 
-  const handleReasignado = useCallback((nuevoNombre: string) => {
+  const handleReasignado = useCallback((_nuevoNombre: string) => {
     if (onTramiteUpdated) onTramiteUpdated()
   }, [onTramiteUpdated])
 

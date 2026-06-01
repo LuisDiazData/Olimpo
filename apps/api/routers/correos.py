@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router de correos, adjuntos y documentos.
 
 Correos:
@@ -49,9 +49,7 @@ from models.usuario import RolUsuario, UsuarioToken
 log = structlog.get_logger(__name__)
 router = APIRouter(tags=["correos"])
 
-_SOLO_DIRECTORES = [
-    Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))
-]
+_SOLO_DIRECTORES = [Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))]
 
 # ---------------------------------------------------------------------------
 # Constantes de SELECT para evitar repeticiÃ³n
@@ -90,6 +88,7 @@ _SEL_DOCUMENTO_DETAIL = "*, adjunto!left(nombre_archivo)"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _armar_correo_list(row: dict) -> CorreoListItem:
     analista = row.pop("usuario", None) or {}
@@ -133,6 +132,7 @@ def _get_correo_o_404(db, correo_id: UUID) -> dict:
 # CORREOS
 # ===========================================================================
 
+
 @router.get(
     "/correos",
     response_model=PaginatedResponse[CorreoListItem],
@@ -146,10 +146,16 @@ def _get_correo_o_404(db, correo_id: UUID) -> dict:
 )
 async def listar_correos(
     tipo: TipoCorreo | None = Query(default=None, description="entrante o saliente."),
-    estado: EstadoCorreo | None = Query(default=None, description="Estado del correo en su ciclo de vida."),
+    estado: EstadoCorreo | None = Query(
+        default=None, description="Estado del correo en su ciclo de vida."
+    ),
     analista_id: UUID | None = Query(default=None, description="UUID del analista responsable."),
-    thread_id: str | None = Query(default=None, description="ID del hilo de Gmail para agrupar conversaciones."),
-    q: str | None = Query(default=None, description="BÃºsqueda en asunto y direcciÃ³n del remitente."),
+    thread_id: str | None = Query(
+        default=None, description="ID del hilo de Gmail para agrupar conversaciones."
+    ),
+    q: str | None = Query(
+        default=None, description="BÃºsqueda en asunto y direcciÃ³n del remitente."
+    ),
     limit: int = Query(default=50, ge=1, le=200, description="MÃ¡ximo de registros por pÃ¡gina."),
     offset: int = Query(default=0, ge=0, description="NÃºmero de registros a saltar."),
     usuario: UsuarioToken = Depends(get_current_user),
@@ -263,7 +269,9 @@ async def aprobar_correo(
             detail=f"El correo estÃ¡ en estado '{correo['estado']}' y no se puede aprobar.",
         )
 
-    db.table("correo").update({"estado": EstadoCorreo.aprobado.value}).eq("id", str(correo_id)).execute()
+    db.table("correo").update({"estado": EstadoCorreo.aprobado.value}).eq(
+        "id", str(correo_id)
+    ).execute()
     log.info("correo_aprobado", correo_id=str(correo_id), por=str(usuario.id))
     return await obtener_correo(correo_id, usuario)
 
@@ -271,6 +279,7 @@ async def aprobar_correo(
 # ===========================================================================
 # CORREOS DE UN TRÃMITE
 # ===========================================================================
+
 
 @router.get("/tramites/{tramite_id}/correos", response_model=list[CorreoTramiteItem])
 async def listar_correos_tramite(
@@ -352,11 +361,13 @@ async def vincular_correo_tramite(
     try:
         result = (
             db.table("correo_tramite")
-            .insert({
-                "correo_id": str(correo_id),
-                "tramite_id": str(tramite_id),
-                "es_origen": body.es_origen,
-            })
+            .insert(
+                {
+                    "correo_id": str(correo_id),
+                    "tramite_id": str(tramite_id),
+                    "es_origen": body.es_origen,
+                }
+            )
             .select("correo_id, tramite_id, es_origen, created_at")
             .execute()
         )
@@ -368,7 +379,7 @@ async def vincular_correo_tramite(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Este correo ya estÃ¡ vinculado a este trÃ¡mite.",
-            )
+            ) from exc
         raise
 
     return CorreoTramiteVinculo.model_validate(result.data)
@@ -387,14 +398,18 @@ async def desvincular_correo_tramite(
 ) -> None:
     # _SOLO_DIRECTORES ya valida auth+rol â€” no se necesita get_current_user aquÃ­
     from core.database import get_admin_db
+
     db = get_admin_db()
-    db.table("correo_tramite").delete().eq("correo_id", str(correo_id)).eq("tramite_id", str(tramite_id)).execute()
+    db.table("correo_tramite").delete().eq("correo_id", str(correo_id)).eq(
+        "tramite_id", str(tramite_id)
+    ).execute()
     log.info("correo_desvinculado", correo_id=str(correo_id), tramite_id=str(tramite_id))
 
 
 # ===========================================================================
 # ADJUNTOS
 # ===========================================================================
+
 
 @router.get("/adjuntos/{adjunto_id}", response_model=AdjuntoResponse)
 async def obtener_adjunto(
@@ -421,6 +436,7 @@ async def obtener_adjunto(
 # ===========================================================================
 # DOCUMENTOS
 # ===========================================================================
+
 
 @router.get("/tramites/{tramite_id}/documentos", response_model=list[DocumentoListItem])
 async def listar_documentos_tramite(
@@ -455,7 +471,9 @@ async def obtener_documento(
         .execute()
     )
     if not result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado."
+        )
     return _armar_documento_response(result.data)
 
 
@@ -489,6 +507,10 @@ async def actualizar_documento(
     if result.data:
         result.data = result.data[0]
     if not result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado.")
-    log.info("documento_validacion_actualizado", doc_id=str(doc_id), cambios=cambios, por=str(usuario.id))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado."
+        )
+    log.info(
+        "documento_validacion_actualizado", doc_id=str(doc_id), cambios=cambios, por=str(usuario.id)
+    )
     return _armar_documento_response(result.data)

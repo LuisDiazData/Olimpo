@@ -15,10 +15,10 @@ from pydantic import BaseModel, Field
 
 from models.usuario import RolUsuario
 
-
 # ---------------------------------------------------------------------------
 # Catálogo de permisos
 # ---------------------------------------------------------------------------
+
 
 class PermisoResponse(BaseModel):
     id: UUID
@@ -35,6 +35,7 @@ class PermisoResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Permisos por rol
 # ---------------------------------------------------------------------------
+
 
 class RolPermisoResponse(BaseModel):
     rol: RolUsuario
@@ -67,6 +68,7 @@ class PermisosUsuarioResponse(BaseModel):
 # Overrides de usuario
 # ---------------------------------------------------------------------------
 
+
 class UsuarioPermisoResponse(BaseModel):
     usuario_id: UUID
     permiso_id: UUID
@@ -83,6 +85,7 @@ class UsuarioPermisoResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Audit log
 # ---------------------------------------------------------------------------
+
 
 class PermisoAuditLogEntry(BaseModel):
     id: UUID
@@ -104,32 +107,25 @@ class PermisoAuditLogEntry(BaseModel):
 # Inputs
 # ---------------------------------------------------------------------------
 
+
 class OtorgarPermisoUsuarioBody(BaseModel):
     """Concede o deniega explícitamente un permiso a un usuario específico."""
 
-    permiso_clave: str = Field(
-        description="Clave del permiso. Ejemplo: 'tramites.reasignar'."
-    )
-    concedido: bool = Field(
-        description="TRUE para conceder, FALSE para denegar explícitamente."
-    )
+    permiso_clave: str = Field(description="Clave del permiso. Ejemplo: 'tramites.reasignar'.")
+    concedido: bool = Field(description="TRUE para conceder, FALSE para denegar explícitamente.")
 
 
 class RevocarPermisoUsuarioBody(BaseModel):
     """Elimina el override de usuario — el permiso vuelve al default del rol."""
 
-    permiso_clave: str = Field(
-        description="Clave del permiso cuyo override se eliminará."
-    )
+    permiso_clave: str = Field(description="Clave del permiso cuyo override se eliminará.")
 
 
 class ConfigurarRolPermisoBody(BaseModel):
     """Modifica el permiso por defecto para un rol completo."""
 
     rol: RolUsuario
-    permiso_clave: str = Field(
-        description="Clave del permiso. Ejemplo: 'reportes.exportar'."
-    )
+    permiso_clave: str = Field(description="Clave del permiso. Ejemplo: 'reportes.exportar'.")
     concedido: bool = Field(
         description="TRUE para conceder por defecto al rol, FALSE para denegar."
     )

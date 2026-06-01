@@ -9,10 +9,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from models.usuario import RamoUsuario
 
-
 # ---------------------------------------------------------------------------
 # Asignacion
 # ---------------------------------------------------------------------------
+
 
 class AsignacionCreate(BaseModel):
     agente_id: UUID
@@ -81,6 +81,7 @@ class ResolverAsignacionResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Cobertura de vacaciones
 # ---------------------------------------------------------------------------
+
 
 class CoberturaVacacionesCreate(BaseModel):
     analista_ausente_id: UUID

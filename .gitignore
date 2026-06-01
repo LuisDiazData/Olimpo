@@ -64,6 +64,8 @@ olimpo_modelo_datos_erd.html
 # ── Especificación funcional (documento binario de negocio) ───────────────────
 *.docx
 *.xlsx
+*.txt
+*.md
 
 # ── Claude Code interno ───────────────────────────────────────────────────────
 .claude/

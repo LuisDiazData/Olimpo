@@ -1,6 +1,6 @@
 "use client"
 
-import { Shield, Mail, Phone, MapPin } from "lucide-react"
+import { Shield, Mail } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -38,12 +38,6 @@ interface Props {
 
 function RolBadge({ rol }: { rol: string }) {
   const style = ROL_STYLES[rol] ?? { label: rol, variant: "slate" as const }
-  return <Badge variant={style.variant}>{style.label}</Badge>
-}
-
-function RamoBadge({ ramo }: { ramo: string | null }) {
-  if (!ramo) return null
-  const style = RAMO_STYLES[ramo] ?? { label: ramo, variant: "slate" as const }
   return <Badge variant={style.variant}>{style.label}</Badge>
 }
 

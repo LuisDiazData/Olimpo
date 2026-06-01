@@ -54,7 +54,7 @@ interface Props {
   ramoCreador?: string | null
 }
 
-export function AgregarUsuarioModal({ open, onClose, onSuccess, rolCreador, ramoCreador }: Props) {
+export function AgregarUsuarioModal({ open, onClose, onSuccess, rolCreador }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [created, setCreated] = useState<string | null>(null)

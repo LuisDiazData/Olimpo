@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       {
         cookies: {
           getAll: () => request.cookies.getAll(),
-          setAll: (cookies) => pendingCookies.push(...cookies),
+          setAll: (cookies: { name: string; value: string; options: CookieOptions }[]) => pendingCookies.push(...cookies),
         },
       }
     )
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   })
 
   const respBody = await response.json().catch(() => null)
-  let result = NextResponse.json(respBody ?? { detail: "No content" }, { status: response.status })
+  const result = NextResponse.json(respBody ?? { detail: "No content" }, { status: response.status })
 
   pendingCookies.forEach(({ name, value, options }) =>
     result.cookies.set(name, value, options)

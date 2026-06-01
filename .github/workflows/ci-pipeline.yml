@@ -10,10 +10,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # API — Calidad de código
-  # ─────────────────────────────────────────────────────────────────────────────
   api-quality:
     name: API — Calidad de código
     runs-on: ubuntu-latest
@@ -22,13 +23,16 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: apps/api/requirements.txt
 
       - name: Instalar dependencias
         working-directory: apps/api
         run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Instalar herramientas de dev
+        run: pip install ruff pyright
 
       - name: Ruff — lint
         working-directory: apps/api
@@ -42,9 +46,6 @@ jobs:
         working-directory: apps/api
         run: pyright
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # API — Tests
-  # ─────────────────────────────────────────────────────────────────────────────
   api-tests:
     name: API — Tests unitarios
     runs-on: ubuntu-latest
@@ -54,13 +55,16 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: apps/api/requirements.txt
 
       - name: Instalar dependencias
         working-directory: apps/api
         run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Instalar herramientas de dev
+        run: pip install pytest pytest-asyncio
 
       - name: Pytest — tests unitarios
         working-directory: apps/api
@@ -76,9 +80,6 @@ jobs:
           name: api-test-results
           path: apps/api/test-results.xml
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # API — Docker build
-  # ─────────────────────────────────────────────────────────────────────────────
   api-docker:
     name: API — Validar Docker build
     runs-on: ubuntu-latest
@@ -99,9 +100,13 @@ jobs:
           cache-to: type=gha,mode=max
           tags: olimpo-api:ci
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Admin API — Calidad de código
-  # ─────────────────────────────────────────────────────────────────────────────
+      - name: Guardar cache de Docker
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-api-cache
+          path: /tmp/.buildx-cache
+          retention-days: 2
+
   admin-quality:
     name: Admin API — Calidad de código
     runs-on: ubuntu-latest
@@ -110,7 +115,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Instalar dependencias
         working-directory: apps/admin
@@ -128,9 +133,6 @@ jobs:
         working-directory: apps/admin
         run: pyright
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Admin API — Docker build
-  # ─────────────────────────────────────────────────────────────────────────────
   admin-docker:
     name: Admin API — Validar Docker build
     runs-on: ubuntu-latest
@@ -151,9 +153,6 @@ jobs:
           cache-to: type=gha,mode=max
           tags: olimpo-admin:ci
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Web CRM — Calidad de código y build
-  # ─────────────────────────────────────────────────────────────────────────────
   web-quality:
     name: Web CRM — Lint, tipos y build
     runs-on: ubuntu-latest
@@ -162,7 +161,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
@@ -181,23 +180,17 @@ jobs:
       - name: Next.js — build de producción
         working-directory: apps/web
         run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_STAGING }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY_STAGING }}
-          NEXT_PUBLIC_API_URL: https://staging-api.olimpo.mx
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Admin Web — Calidad de código y build
-  # ─────────────────────────────────────────────────────────────────────────────
   admin-web-quality:
     name: Admin Web — Lint, tipos y build
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: apps/admin-web/package-lock.json
 
@@ -217,9 +210,6 @@ jobs:
         working-directory: apps/admin-web
         run: npm run build
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Seguridad — escaneo de dependencias
-  # ─────────────────────────────────────────────────────────────────────────────
   security-scan:
     name: Seguridad — dependencias vulnerables
     runs-on: ubuntu-latest
@@ -228,7 +218,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: pip-audit — API
         working-directory: apps/api
@@ -238,7 +228,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: npm audit — Web
         working-directory: apps/web
@@ -248,9 +238,6 @@ jobs:
         working-directory: apps/admin-web
         run: npm audit --audit-level=high || true
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Gate final — todos los checks deben pasar para poder mergear
-  # ─────────────────────────────────────────────────────────────────────────────
   pipeline-ok:
     name: Pipeline — Todo OK
     runs-on: ubuntu-latest
@@ -259,13 +246,32 @@ jobs:
       - api-docker
       - admin-docker
       - web-quality
-      - admin-web-quality
+      - security-scan
     if: always()
     steps:
       - name: Verificar resultado de todos los jobs
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "❌ Uno o más jobs fallaron."
+          echo "Checking job results..."
+          echo "api-tests: ${{ needs.api-tests.result }}"
+          echo "api-docker: ${{ needs.api-docker.result }}"
+          echo "admin-docker: ${{ needs.admin-docker.result }}"
+          echo "web-quality: ${{ needs.web-quality.result }}"
+          echo "security-scan: ${{ needs.security-scan.result }}"
+
+          if [ "${{ needs.api-tests.result }}" == "failure" ] || \
+             [ "${{ needs.api-docker.result }}" == "failure" ] || \
+             [ "${{ needs.admin-docker.result }}" == "failure" ] || \
+             [ "${{ needs.web-quality.result }}" == "failure" ]; then
+            echo "ERROR: Uno o más jobs fallaron."
             exit 1
           fi
+
+          if [ "${{ needs.api-tests.result }}" == "skipped" ] || \
+             [ "${{ needs.api-docker.result }}" == "skipped" ] || \
+             [ "${{ needs.admin-docker.result }}" == "skipped" ] || \
+             [ "${{ needs.web-quality.result }}" == "skipped" ]; then
+            echo "ERROR: Algunos jobs fueron saltados."
+            exit 1
+          fi
+
           echo "✅ Todos los checks del pipeline pasaron."

@@ -314,7 +314,7 @@ export default async function TramitesPage({
       {noAgenteResults && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           No se encontró ningún agente con el nombre o CUA{" "}
-          <strong>"{agenteQuery}"</strong>. Verifica el texto ingresado.
+          <strong>&quot;{agenteQuery}&quot;</strong>. Verifica el texto ingresado.
         </div>
       )}
 

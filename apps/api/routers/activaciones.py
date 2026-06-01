@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router de activaciones GNP (OT).
 
 GET    /tramites/{id}/activaciones          â€” historial de OTs del trÃ¡mite
@@ -29,19 +29,44 @@ _GERENTES_Y_DIRECTORES = [
 # Modelos
 # ---------------------------------------------------------------------------
 
+
 class ActivacionCreate(BaseModel):
-    numero_ot: str = Field(min_length=1, max_length=50, description="NÃºmero de OT asignado por GNP.")
-    motivo: str | None = Field(default=None, max_length=500, description="DescripciÃ³n del motivo de la activaciÃ³n. Ej: 'Alta nueva GMM', 'Endoso ampliaciÃ³n de suma'.")
-    fecha_activacion: date = Field(default_factory=date.today, description="Fecha en que GNP registrÃ³ la activaciÃ³n. Por defecto: hoy.")
-    notas: str | None = Field(default=None, max_length=1000, description="Notas adicionales del analista sobre esta activaciÃ³n.")
-    force_update_folio: bool = Field(default=False, description="Si True, actualiza tramite.folio_ot aunque ya tenga uno. Usar para correcciones.")
+    numero_ot: str = Field(
+        min_length=1, max_length=50, description="NÃºmero de OT asignado por GNP."
+    )
+    motivo: str | None = Field(
+        default=None,
+        max_length=500,
+        description="DescripciÃ³n del motivo de la activaciÃ³n. Ej: 'Alta nueva GMM', 'Endoso ampliaciÃ³n de suma'.",
+    )
+    fecha_activacion: date = Field(
+        default_factory=date.today,
+        description="Fecha en que GNP registrÃ³ la activaciÃ³n. Por defecto: hoy.",
+    )
+    notas: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Notas adicionales del analista sobre esta activaciÃ³n.",
+    )
+    force_update_folio: bool = Field(
+        default=False,
+        description="Si True, actualiza tramite.folio_ot aunque ya tenga uno. Usar para correcciones.",
+    )
 
 
 class ActivacionUpdate(BaseModel):
-    resuelta: bool | None = Field(default=None, description="Marcar como resuelta cuando GNP cierra la OT.")
-    resultado: str | None = Field(default=None, description="Resultado final de GNP: aprobado, rechazado o pendiente.")
-    fecha_resolucion: date | None = Field(default=None, description="Fecha en que GNP resolviÃ³ la OT.")
-    notas: str | None = Field(default=None, max_length=1000, description="Notas adicionales del analista.")
+    resuelta: bool | None = Field(
+        default=None, description="Marcar como resuelta cuando GNP cierra la OT."
+    )
+    resultado: str | None = Field(
+        default=None, description="Resultado final de GNP: aprobado, rechazado o pendiente."
+    )
+    fecha_resolucion: date | None = Field(
+        default=None, description="Fecha en que GNP resolviÃ³ la OT."
+    )
+    notas: str | None = Field(
+        default=None, max_length=1000, description="Notas adicionales del analista."
+    )
 
 
 class ActivacionResponse(BaseModel):
@@ -65,6 +90,7 @@ class ActivacionResponse(BaseModel):
 # GET /tramites/{id}/activaciones
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/tramites/{tramite_id}/activaciones",
     response_model=list[ActivacionResponse],
@@ -77,7 +103,9 @@ class ActivacionResponse(BaseModel):
 )
 async def listar_activaciones(
     tramite_id: UUID,
-    solo_pendientes: bool = Query(default=False, description="True para ver solo OTs que GNP aÃºn no ha resuelto."),
+    solo_pendientes: bool = Query(
+        default=False, description="True para ver solo OTs que GNP aÃºn no ha resuelto."
+    ),
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> list[ActivacionResponse]:
     db = get_user_db(usuario.access_token)
@@ -93,6 +121,7 @@ async def listar_activaciones(
 # ---------------------------------------------------------------------------
 # POST /tramites/{id}/activaciones
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/tramites/{tramite_id}/activaciones",
@@ -113,19 +142,25 @@ async def crear_activacion(
 ) -> ActivacionResponse:
     db = get_user_db(usuario.access_token)
 
-    result = db.rpc("registrar_activacion_gnp", {
-        "p_tramite_id": str(tramite_id),
-        "p_numero_ot": body.numero_ot,
-        "p_motivo": body.motivo,
-        "p_fecha_activacion": body.fecha_activacion.isoformat(),
-        "p_notas": body.notas,
-        "p_force_update_folio": body.force_update_folio,
-    }).execute()
+    result = db.rpc(
+        "registrar_activacion_gnp",
+        {
+            "p_tramite_id": str(tramite_id),
+            "p_numero_ot": body.numero_ot,
+            "p_motivo": body.motivo,
+            "p_fecha_activacion": body.fecha_activacion.isoformat(),
+            "p_notas": body.notas,
+            "p_force_update_folio": body.force_update_folio,
+        },
+    ).execute()
 
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error_code": "ERROR_ACTIVACION", "mensaje": "No se pudo registrar la activaciÃ³n de GNP."},
+            detail={
+                "error_code": "ERROR_ACTIVACION",
+                "mensaje": "No se pudo registrar la activaciÃ³n de GNP.",
+            },
         )
 
     ot_id = result.data
@@ -134,16 +169,25 @@ async def crear_activacion(
     if not ot_result.data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error_code": "ERROR_ACTIVACION", "mensaje": "La activaciÃ³n se registrÃ³ pero no se pudo recuperar."},
+            detail={
+                "error_code": "ERROR_ACTIVACION",
+                "mensaje": "La activaciÃ³n se registrÃ³ pero no se pudo recuperar.",
+            },
         )
 
-    log.info("activacion_gnp_registrada", tramite_id=str(tramite_id), ot=body.numero_ot, por=str(usuario.id))
+    log.info(
+        "activacion_gnp_registrada",
+        tramite_id=str(tramite_id),
+        ot=body.numero_ot,
+        por=str(usuario.id),
+    )
     return ActivacionResponse.model_validate(ot_result.data)
 
 
 # ---------------------------------------------------------------------------
 # PATCH /tramites/{id}/activaciones/{ot_id}
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/tramites/{tramite_id}/activaciones/{ot_id}",
@@ -166,7 +210,10 @@ async def actualizar_activacion(
     if not cambios:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"error_code": "SIN_CAMBIOS", "mensaje": "No se enviaron campos para actualizar."},
+            detail={
+                "error_code": "SIN_CAMBIOS",
+                "mensaje": "No se enviaron campos para actualizar.",
+            },
         )
 
     if "fecha_resolucion" in cambios:
@@ -187,8 +234,16 @@ async def actualizar_activacion(
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "ACTIVACION_NO_ENCONTRADA", "mensaje": "ActivaciÃ³n no encontrada en este trÃ¡mite."},
+            detail={
+                "error_code": "ACTIVACION_NO_ENCONTRADA",
+                "mensaje": "ActivaciÃ³n no encontrada en este trÃ¡mite.",
+            },
         )
 
-    log.info("activacion_actualizada", ot_id=str(ot_id), cambios=list(cambios.keys()), por=str(usuario.id))
+    log.info(
+        "activacion_actualizada",
+        ot_id=str(ot_id),
+        cambios=list(cambios.keys()),
+        por=str(usuario.id),
+    )
     return ActivacionResponse.model_validate(result.data)

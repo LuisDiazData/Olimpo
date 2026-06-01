@@ -7,7 +7,6 @@ import { z } from "zod"
 import { Phone, MessageCircle, Users, CheckSquare } from "lucide-react"
 import { SlideOver } from "@/components/ui/slide-over"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { TramiteSearchItem, AgenteSearchItem } from "@/hooks/use-busqueda"
 import type { Medio } from "@/hooks/use-comunicacion"
@@ -81,7 +80,7 @@ export function QuickCommunicationForm({
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error((body as any).detail ?? "Error al guardar")
+        throw new Error((body as { detail?: string }).detail ?? "Error al guardar")
       }
 
       reset()

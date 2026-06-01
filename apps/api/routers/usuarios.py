@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router de usuarios del CRM Olimpo.
 
 GET    /usuarios              â€" lista (directores: todos; gerentes: su ramo; analistas: su ramo)
@@ -11,13 +11,14 @@ La creaciÃ³n de usuario pasa por Supabase Auth Admin API (service_role).
 El trigger sync_auth_usuario en la DB crea el perfil en public.usuario.
 """
 
+from typing import Any, cast
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase import AuthApiError, Client
 
-from core.auth import get_current_user, require_permiso, require_roles
+from core.auth import require_permiso, require_roles
 from core.database import get_admin_db_dep, get_db
 from models.usuario import (
     RolUsuario,
@@ -37,8 +38,8 @@ router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 # El gerente solo puede crear analistas de su propio ramo (validado en el endpoint).
 _ROLES_ASIGNABLES: dict[RolUsuario, set[RolUsuario]] = {
     RolUsuario.director_general: {RolUsuario.director_ops, RolUsuario.gerente, RolUsuario.analista},
-    RolUsuario.director_ops:     {RolUsuario.gerente, RolUsuario.analista},
-    RolUsuario.gerente:          {RolUsuario.analista},
+    RolUsuario.director_ops: {RolUsuario.gerente, RolUsuario.analista},
+    RolUsuario.gerente: {RolUsuario.analista},
 }
 
 _SOLO_DIRECTORES = [Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))]
@@ -48,11 +49,18 @@ _SOLO_DIRECTORES = [Depends(require_roles(RolUsuario.director_general, RolUsuari
 # GET /usuarios
 # ---------------------------------------------------------------------------
 
+
 @router.get("", response_model=list[UsuarioListItem])
 def listar_usuarios(
-    activo: bool | None = Query(default=None, description="Filtrar por estado activo/inactivo. Por defecto devuelve todos."),
-    ramo: str | None = Query(default=None, description="Filtrar por ramo. Gerentes solo ven su ramo (RLS)."),
-    rol: RolUsuario | None = Query(default=None, description="Filtrar por rol. Útil para obtener solo analistas disponibles."),
+    activo: bool | None = Query(
+        default=None, description="Filtrar por estado activo/inactivo. Por defecto devuelve todos."
+    ),
+    ramo: str | None = Query(
+        default=None, description="Filtrar por ramo. Gerentes solo ven su ramo (RLS)."
+    ),
+    rol: RolUsuario | None = Query(
+        default=None, description="Filtrar por rol. Útil para obtener solo analistas disponibles."
+    ),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Client = Depends(get_db),
@@ -66,9 +74,7 @@ def listar_usuarios(
     Para que un gerente vea los analistas disponibles de su ramo:
       GET /usuarios?rol=analista&activo=true
     """
-    query = db.table("usuario").select(
-        "id, nombre, email, rol, ramo, ramos_adicionales, activo"
-    )
+    query = db.table("usuario").select("id, nombre, email, rol, ramo, ramos_adicionales, activo")
 
     if activo is not None:
         query = query.eq("activo", activo)
@@ -86,6 +92,7 @@ def listar_usuarios(
 # POST /usuarios
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "",
     response_model=UsuarioResponse,
@@ -93,7 +100,9 @@ def listar_usuarios(
 )
 def crear_usuario(
     body: UsuarioCreate,
-    caller: UsuarioToken = Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops, RolUsuario.gerente)),
+    caller: UsuarioToken = Depends(
+        require_roles(RolUsuario.director_general, RolUsuario.director_ops, RolUsuario.gerente)
+    ),
     admin: Client = Depends(get_admin_db_dep),
 ) -> UsuarioResponse:
     """
@@ -118,12 +127,11 @@ def crear_usuario(
             ),
         )
 
-    if caller.rol == RolUsuario.gerente:
-        if body.ramo != caller.ramo:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Solo puedes crear analistas de tu ramo '{caller.ramo}'.",
-            )
+    if caller.rol == RolUsuario.gerente and body.ramo != caller.ramo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Solo puedes crear analistas de tu ramo '{caller.ramo}'.",
+        )
 
     user_metadata = {"nombre": body.nombre}
     if body.telefono:
@@ -136,29 +144,36 @@ def crear_usuario(
         app_metadata["ramo"] = body.ramo.value
 
     try:
-        auth_response = admin.auth.admin.create_user({
-            "email": str(body.email),
-            "password": body.password,
-            "email_confirm": True,
-            "user_metadata": user_metadata,
-            "app_metadata": app_metadata,
-        })
+        auth_response = admin.auth.admin.create_user(
+            {
+                "email": str(body.email),
+                "password": body.password,
+                "email_confirm": True,
+                "user_metadata": user_metadata,
+                "app_metadata": app_metadata,
+            }
+        )
     except AuthApiError as exc:
-        if "already registered" in str(exc).lower() or "already been registered" in str(exc).lower():
+        if (
+            "already registered" in str(exc).lower()
+            or "already been registered" in str(exc).lower()
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"El correo '{body.email}' ya está registrado.",
-            )
+            ) from exc
         log.error("error_crear_usuario_auth", email=str(body.email), error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Error al crear el usuario en Auth: {exc}",
-        )
+        ) from exc
 
     # El trigger de la DB ya insertÃ³ el perfil â€" lo leemos con service_role
     result = (
         admin.table("usuario")
-        .select("id, nombre, email, rol, ramo, ramos_adicionales, telefono, firma_html, activo, created_at, updated_at")
+        .select(
+            "id, nombre, email, rol, ramo, ramos_adicionales, telefono, firma_html, activo, created_at, updated_at"
+        )
         .eq("id", auth_response.user.id)
         .maybe_single()
         .execute()
@@ -180,13 +195,15 @@ def crear_usuario(
             {"ramos_adicionales": [r.value for r in body.ramos_adicionales]}
         ).eq("id", auth_response.user.id).execute()
 
-    log.info("usuario_creado", id=result.data["id"], email=body.email, rol=body.rol)
-    return UsuarioResponse.model_validate(result.data)
+    perfil = cast(dict[str, Any], result.data)
+    log.info("usuario_creado", id=perfil["id"], email=body.email, rol=body.rol)
+    return UsuarioResponse.model_validate(perfil)
 
 
 # ---------------------------------------------------------------------------
 # GET /usuarios/{id}
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{usuario_id}", response_model=UsuarioResponse)
 def obtener_usuario(
@@ -199,7 +216,9 @@ def obtener_usuario(
     """
     result = (
         db.table("usuario")
-        .select("id, nombre, email, rol, ramo, ramos_adicionales, telefono, firma_html, activo, created_at, updated_at")
+        .select(
+            "id, nombre, email, rol, ramo, ramos_adicionales, telefono, firma_html, activo, created_at, updated_at"
+        )
         .eq("id", str(usuario_id))
         .maybe_single()
         .execute()
@@ -211,12 +230,13 @@ def obtener_usuario(
             detail="Usuario no encontrado.",
         )
 
-    return UsuarioResponse.model_validate(result.data)
+    return UsuarioResponse.model_validate(cast(dict[str, Any], result.data))
 
 
 # ---------------------------------------------------------------------------
 # PATCH /usuarios/{id}
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/{usuario_id}",
@@ -243,20 +263,21 @@ def actualizar_usuario(
             detail="No se enviaron campos para actualizar.",
         )
 
-    if "ramos_adicionales" in cambios and cambios["ramos_adicionales"] is not None:
+    if body.ramos_adicionales is not None:
         cambios["ramos_adicionales"] = [r.value for r in body.ramos_adicionales]
 
     result = (
         admin.table("usuario")
         .update(cambios)
         .eq("id", str(usuario_id))
-        .select("id, nombre, email, rol, ramo, ramos_adicionales, telefono, firma_html, activo, created_at, updated_at")
+        .select(
+            "id, nombre, email, rol, ramo, ramos_adicionales, telefono, firma_html, activo, created_at, updated_at"
+        )
         .execute()
     )
-    if result.data:
-        result.data = result.data[0]
+    row: dict[str, Any] | None = result.data[0] if result.data else None
 
-    if not result.data:
+    if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario no encontrado.",
@@ -270,13 +291,16 @@ def actualizar_usuario(
 # DELETE /usuarios/{id}  â€" soft-delete
 # ---------------------------------------------------------------------------
 
+
 @router.delete(
     "/{usuario_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 def desactivar_usuario(
     usuario_id: UUID,
-    caller: UsuarioToken = Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops, RolUsuario.gerente)),
+    caller: UsuarioToken = Depends(
+        require_roles(RolUsuario.director_general, RolUsuario.director_ops, RolUsuario.gerente)
+    ),
     admin: Client = Depends(get_admin_db_dep),
 ) -> None:
     """
@@ -302,25 +326,23 @@ def desactivar_usuario(
             .execute()
         )
         if not objetivo.data:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado."
+            )
 
-        if objetivo.data["rol"] != RolUsuario.analista:
+        objetivo_data = cast(dict[str, Any], objetivo.data)
+        if objetivo_data["rol"] != RolUsuario.analista:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo puedes desactivar analistas.",
             )
-        if objetivo.data["ramo"] != caller.ramo:
+        if objetivo_data["ramo"] != caller.ramo:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Solo puedes desactivar analistas de tu ramo '{caller.ramo}'.",
             )
 
-    result = (
-        admin.table("usuario")
-        .update({"activo": False})
-        .eq("id", str(usuario_id))
-        .execute()
-    )
+    result = admin.table("usuario").update({"activo": False}).eq("id", str(usuario_id)).execute()
 
     if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
@@ -336,6 +358,7 @@ def desactivar_usuario(
 # ---------------------------------------------------------------------------
 # POST /usuarios/{id}/reset-password
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/{usuario_id}/reset-password",
@@ -366,23 +389,26 @@ def enviar_reset_password(
             detail="Usuario no encontrado.",
         )
 
-    if not result.data["activo"]:
+    usuario_data = cast(dict[str, Any], result.data)
+    if not usuario_data["activo"]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="El usuario está inactivo y no puede recuperar su contraseña.",
         )
 
     try:
-        admin.auth.admin.generate_link({
-            "type": "recovery",
-            "email": result.data["email"],
-        })
+        admin.auth.admin.generate_link(
+            {
+                "type": "recovery",
+                "email": usuario_data["email"],
+            }
+        )
     except AuthApiError as exc:
         log.error("error_generar_recovery_link", usuario_id=str(usuario_id), error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="No se pudo enviar el correo de recuperación. Intenta de nuevo.",
-        )
+        ) from exc
 
-    log.info("reset_password_enviado", usuario_id=str(usuario_id), email=result.data["email"])
+    log.info("reset_password_enviado", usuario_id=str(usuario_id), email=usuario_data["email"])
     return {"mensaje": "Enlace de recuperación enviado al correo del usuario."}

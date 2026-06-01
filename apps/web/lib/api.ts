@@ -1,7 +1,5 @@
 import { getSupabaseBrowserClient } from "./supabase"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
-
 export class ApiError extends Error {
   constructor(
     public status: number,

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router de notificaciones.
 
 GET    /notificaciones                     â€” notificaciones del usuario actual
@@ -27,6 +27,7 @@ router = APIRouter(prefix="/notificaciones", tags=["notificaciones"])
 # Modelos
 # ---------------------------------------------------------------------------
 
+
 class NotificacionResponse(BaseModel):
     id: UUID
     usuario_id: UUID
@@ -34,7 +35,9 @@ class NotificacionResponse(BaseModel):
     titulo: str
     cuerpo: str
     tramite_id: UUID | None = Field(default=None, description="TrÃ¡mite relacionado, si aplica.")
-    datos: dict = Field(default_factory=dict, description="Datos adicionales estructurados segÃºn el tipo.")
+    datos: dict = Field(
+        default_factory=dict, description="Datos adicionales estructurados segÃºn el tipo."
+    )
     leida: bool = Field(description="False: pendiente de leer. True: ya vista por el usuario.")
     created_at: datetime
 
@@ -49,6 +52,7 @@ class ConteoNotificaciones(BaseModel):
 # GET /notificaciones
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "",
     response_model=PaginatedResponse[NotificacionResponse],
@@ -61,7 +65,9 @@ class ConteoNotificaciones(BaseModel):
     ),
 )
 async def listar_notificaciones(
-    solo_no_leidas: bool = Query(default=False, description="True para ver solo notificaciones pendientes de leer."),
+    solo_no_leidas: bool = Query(
+        default=False, description="True para ver solo notificaciones pendientes de leer."
+    ),
     limit: int = Query(default=50, ge=1, le=200, description="MÃ¡ximo de registros por pÃ¡gina."),
     offset: int = Query(default=0, ge=0, description="NÃºmero de registros a saltar."),
     usuario: UsuarioToken = Depends(get_current_user),
@@ -78,9 +84,11 @@ async def listar_notificaciones(
     total = count_result.count or 0
 
     result = (
-        _apply_filters(db.table("notificacion").select(
-            "id, usuario_id, tipo, titulo, cuerpo, tramite_id, datos, leida, created_at"
-        ))
+        _apply_filters(
+            db.table("notificacion").select(
+                "id, usuario_id, tipo, titulo, cuerpo, tramite_id, datos, leida, created_at"
+            )
+        )
         .order("created_at", desc=True)
         .range(offset, offset + limit - 1)
         .execute()
@@ -93,6 +101,7 @@ async def listar_notificaciones(
 # ---------------------------------------------------------------------------
 # GET /notificaciones/conteo
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/conteo",
@@ -122,6 +131,7 @@ async def contar_no_leidas(
 # PATCH /notificaciones/{id}/marcar-leida
 # ---------------------------------------------------------------------------
 
+
 @router.patch(
     "/{notificacion_id}/marcar-leida",
     response_model=NotificacionResponse,
@@ -150,7 +160,10 @@ async def marcar_leida(
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "NOTIFICACION_NO_ENCONTRADA", "mensaje": "NotificaciÃ³n no encontrada."},
+            detail={
+                "error_code": "NOTIFICACION_NO_ENCONTRADA",
+                "mensaje": "NotificaciÃ³n no encontrada.",
+            },
         )
     return NotificacionResponse.model_validate(result.data)
 
@@ -158,6 +171,7 @@ async def marcar_leida(
 # ---------------------------------------------------------------------------
 # POST /notificaciones/marcar-todas-leidas
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/marcar-todas-leidas",

@@ -81,6 +81,7 @@ class EstadoValidacionDocumento(StrEnum):
 # Adjunto — NUNCA exponer el campo 'password'
 # ---------------------------------------------------------------------------
 
+
 class AdjuntoResponse(BaseModel):
     id: UUID
     correo_id: UUID
@@ -101,6 +102,7 @@ class AdjuntoResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Documento
 # ---------------------------------------------------------------------------
+
 
 class DocumentoListItem(BaseModel):
     """Vista compacta — excluye texto_ocr y datos_extraidos (pueden ser grandes)."""
@@ -157,6 +159,7 @@ class DocumentoValidacionUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 # Correo
 # ---------------------------------------------------------------------------
+
 
 class CorreoListItem(BaseModel):
     id: UUID
