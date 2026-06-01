@@ -55,7 +55,7 @@ async def listar_asignaciones(
     activo: bool | None = Query(
         default=True, description="False para incluir reglas desactivadas."
     ),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> list[AsignacionResponse]:
