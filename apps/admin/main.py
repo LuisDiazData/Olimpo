@@ -50,6 +50,8 @@ def create_app() -> FastAPI:
     # -------------------------------------------------------------------------
     @app.middleware("http")
     async def ip_allowlist(request: Request, call_next):
+        if request.url.path == "/health":
+            return await call_next(request)
         forwarded = request.headers.get("x-forwarded-for", "")
         if forwarded:
             client_ip = forwarded.split(",")[0].strip()
@@ -78,6 +80,13 @@ def create_app() -> FastAPI:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": "Error interno del servidor."},
         )
+
+    # -------------------------------------------------------------------------
+    # Health — exempt from IP allowlist, used by Railway healthcheck
+    # -------------------------------------------------------------------------
+    @app.get("/health", include_in_schema=False)
+    async def health():
+        return {"status": "ok"}
 
     # -------------------------------------------------------------------------
     # Routers
