@@ -8,7 +8,7 @@ Uso:
         return PaginatedResponse.build(items=items, total=total, offset=offset, limit=limit)
 """
 
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
