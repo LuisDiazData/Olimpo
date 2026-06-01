@@ -6,7 +6,7 @@ on:
       skip_migrations:
         description: 'Saltar migraciones de DB (útil si ya se aplicaron)'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 concurrency:
