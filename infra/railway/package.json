@@ -1,0 +1,20 @@
+{
+  "name": "olimpo-railway-infra",
+  "version": "1.0.0",
+  "description": "Configuración de infraestructura Railway para Olimpo CRM",
+  "private": true,
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "status": "railway status --json",
+    "logs": "railway logs --service olimpo-api --environment staging --lines 100",
+    "deploy:staging:api": "cd ../../apps/api && railway up --service olimpo-api-staging --environment staging --detach",
+    "deploy:staging:admin": "cd ../../apps/admin && railway up --service olimpo-admin-staging --environment staging --detach",
+    "deploy:prod:api": "cd ../../apps/api && railway up --service olimpo-api --environment production --detach",
+    "deploy:prod:admin": "cd ../../apps/admin && railway up --service olimpo-admin --environment production --detach",
+    "variables:list": "railway variable list --json",
+    "domains:list": "railway domain --json"
+  },
+  "devDependencies": {
+    "@railway/cli": "latest"
+  }
+}
