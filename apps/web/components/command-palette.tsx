@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Search, FileText, Users, MessageSquarePlus, X, Loader2 } from "lucide-react"
 import { clsx } from "clsx"
-import { useBusqueda, type SearchItem, type TramiteSearchItem, type AgenteSearchItem } from "@/hooks/use-busqueda"
+import { useBusqueda, type SearchItem } from "@/hooks/use-busqueda"
 import { QuickCommunicationForm } from "@/components/comunicacion/quick-communication-form"
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -44,10 +44,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [showCommForm, setShowCommForm] = useState(false)
   const [selectedItem, setSelectedItem] = useState<SearchItem | null>(null)
 
-  const allItems: (SearchItem | { type: "action"; id: string; label: string })[] = [
-    ...results.tramites,
-    ...results.agentes,
-  ]
+  const allItems = useMemo<(SearchItem | { type: "action"; id: string; label: string })[]>(
+    () => [...results.tramites, ...results.agentes],
+    [results.tramites, results.agentes]
+  )
 
   const hasResults = allItems.length > 0
   const showEmpty = query.trim().length > 0 && !results.isLoading && !hasResults

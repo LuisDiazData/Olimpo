@@ -211,8 +211,8 @@ export async function getDashboardData(
     // New queries
     backlogRes,
     eventosTurnadoRes,
-    tramiteEventosRes,
-    escaladosRes,
+    _tramiteEventosRes,
+    _escaladosRes,
     estancadosRes,
   ] = await Promise.all([
     // KPI 1 — trámites activos
@@ -508,16 +508,6 @@ export async function getDashboardData(
 
   // ── Tiempo promedio por estado ────────────────────────────────────────────
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const eventosRaw = (tramiteEventosRes.data ?? []) as any[]
-  const estadoDiasMap: Record<string, { total_ms: number; count: number }> = {}
-  for (const ev of eventosRaw) {
-    if (!ev.estado_nuevo) continue
-    // Solo eventos que tienen fecha_anterior para calcular duración en ese estado
-    // Approximación: usamos created_at como proxy del tiempo en ese estado
-    // (Esto sobreestima pero sirve como indicador relativo)
-  }
-
   // Para cada estado activo, calculamos avg dias desde que entró
   const ESTADO_LABELS: Record<string, string> = {
     recibido:                   "Recibido",
@@ -646,7 +636,7 @@ export async function getDashboardData(
   }
 
   const analistaIds = Array.from(analistMap.keys())
-  let analistasNombres: Record<string, string> = {}
+  const analistasNombres: Record<string, string> = {}
   if (analistaIds.length > 0) {
     const nombresRes = await supabase
       .from("usuario")

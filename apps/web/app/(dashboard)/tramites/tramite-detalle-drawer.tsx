@@ -18,7 +18,6 @@ import {
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { useUser } from "@/components/providers/user-provider"
-import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api"
 import { ReasignarTramiteModal } from "@/components/asignaciones/reasignar-tramite-modal"
 import { ESTADO_BADGE, TIPO_BADGE, PRIORIDAD_BADGE, RAMO_BADGE, formatFechaCorta } from "./shared"
@@ -254,7 +253,7 @@ export function TramiteDetalleDrawer({ tramite, onClose, onTramiteUpdated }: Tra
     })
   }, [tramite, puedeReasignar])
 
-  const handleReasignado = useCallback((nuevoNombre: string) => {
+  const handleReasignado = useCallback((_nuevoNombre: string) => {
     if (onTramiteUpdated) onTramiteUpdated()
   }, [onTramiteUpdated])
 
