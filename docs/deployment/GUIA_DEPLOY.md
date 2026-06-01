@@ -106,7 +106,7 @@ vercel --version      # >= 37.0
 
 ```bash
 # En la raíz del proyecto
-git remote add origin https://github.com/TU-USUARIO/olimpo.git
+git remote add origin https://github.com/LuisDiazData/Olimpo.git
 
 # Crear rama develop desde master/main
 git checkout -b develop
