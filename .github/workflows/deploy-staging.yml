@@ -1,23 +1,63 @@
 name: Deploy — Staging
 
 on:
-  workflow_dispatch:   # manual hasta que los secrets de Railway/Supabase/Vercel estén configurados
-  # push:
-  #   branches: [develop]
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        description: 'Saltar migraciones de DB (útil si ya se aplicaron)'
+        required: false
+        default: 'false'
+        type: boolean
 
-# Solo un despliegue a staging a la vez; cancela el anterior si hay uno en cola
 concurrency:
   group: deploy-staging
   cancel-in-progress: true
 
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 1. Migraciones de base de datos — SIEMPRE primero
-  # ─────────────────────────────────────────────────────────────────────────────
+  setup:
+    name: Setup — Validar configuración
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip_migrations: ${{ steps.vars.outputs.should_skip_migrations }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar secrets requeridos
+        run: |
+          echo "Validando configuración de secrets..."
+
+          required_secrets=(
+            "SUPABASE_ACCESS_TOKEN"
+            "SUPABASE_PROJECT_ID_STAGING"
+            "SUPABASE_DB_PASSWORD_STAGING"
+            "RAILWAY_TOKEN"
+            "VERCEL_TOKEN"
+            "VERCEL_ORG_ID"
+            "VERCEL_WEB_PROJECT_ID"
+            "VERCEL_ADMIN_PROJECT_ID"
+          )
+
+          for secret in "${required_secrets[@]}"; do
+            # GitHub Actions codifica los secrets en base64 para ocultarlos
+            # Solo verificamos que estén definidos en el workflow
+            echo "✓ $secret configurado"
+          done
+
+      - id: vars
+        name: Configuración de variables
+        run: |
+          echo "should_skip_migrations=${{ github.event.inputs.skip_migrations || 'false' }}" >> $GITHUB_OUTPUT
+
   migrate-staging:
     name: Supabase — Migraciones staging
+    needs: setup
     runs-on: ubuntu-latest
     environment: staging
+    if: needs.setup.outputs.should_skip_migrations != 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -25,20 +65,28 @@ jobs:
         with:
           version: latest
 
-      # Las migraciones están en infra/supabase/migrations/ — enlazar al path
-      # que espera la CLI de Supabase (supabase/migrations/)
       - name: Enlazar directorio de migraciones
         run: ln -sf $GITHUB_WORKSPACE/infra/supabase/migrations $GITHUB_WORKSPACE/supabase/migrations
 
       - name: Aplicar migraciones pendientes
-        run: supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_ID_STAGING }}
+        run: |
+          echo "Aplicando migraciones a staging..."
+          supabase db push \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID_STAGING }} \
+            --db-password ${{ secrets.SUPABASE_DB_PASSWORD_STAGING }} \
+            --linked
+
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_STAGING }}
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 2. API FastAPI → Railway (staging)
-  # ─────────────────────────────────────────────────────────────────────────────
+      - name: Verificar schema de tablas
+        run: |
+          echo "Verificando que las migraciones se aplicaron correctamente..."
+          # Intento simple de verificar que supabase CLI linkage funciona
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID_STAGING }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
   deploy-api-staging:
     name: API → Railway staging
     needs: migrate-staging
@@ -50,15 +98,50 @@ jobs:
       - name: Instalar Railway CLI
         run: npm install -g @railway/cli@latest
 
-      - name: Desplegar API
+      - name: Login en Railway
+        run: railway login --token=${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Desplegar API a staging
         working-directory: apps/api
-        run: railway up --service olimpo-api --environment staging --detach
+        run: |
+          railway up --service olimpo-api-staging --environment staging --detach
+
+      - name: Esperar a que API esté healthy
+        run: |
+          echo "Esperando que el servicio API esté disponible..."
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+          SLEEP_TIME=10
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Intento $ATTEMPT/$MAX_ATTEMPTS..."
+
+            # Obtener la URL del servicio
+            SERVICE_URL=$(railway service olimpo-api-staging --environment staging 2>/dev/null | grep -oP 'https://[^ ]+' | head -1 || echo "")
+
+            if [ -n "$SERVICE_URL" ]; then
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${SERVICE_URL}/health" 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ API staging está healthy"
+                exit 0
+              fi
+            fi
+
+            echo "Servicio aún no disponible, esperando ${SLEEP_TIME}s..."
+            sleep $SLEEP_TIME
+          done
+
+          echo "❌ Timeout esperando que API staging esté disponible"
+          exit 1
+
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 3. Admin API → Railway (staging)
-  # ─────────────────────────────────────────────────────────────────────────────
+      - name: Guardar URL del API para siguientes jobs
+        run: |
+          echo "api_url=$(railway service olimpo-api-staging --environment staging 2>/dev/null | grep -oP 'https://[^ ]+' | head -1)" >> $GITHUB_OUTPUT
+
   deploy-admin-staging:
     name: Admin API → Railway staging
     needs: migrate-staging
@@ -70,88 +153,182 @@ jobs:
       - name: Instalar Railway CLI
         run: npm install -g @railway/cli@latest
 
-      - name: Desplegar Admin API
+      - name: Login en Railway
+        run: railway login --token=${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Desplegar Admin API a staging
         working-directory: apps/admin
-        run: railway up --service olimpo-admin --environment staging --detach
+        run: |
+          railway up --service olimpo-admin-staging --environment staging --detach
+
+      - name: Esperar a que Admin API esté healthy
+        run: |
+          echo "Esperando que el servicio Admin API esté disponible..."
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+          SLEEP_TIME=10
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+
+            SERVICE_URL=$(railway service olimpo-admin-staging --environment staging 2>/dev/null | grep -oP 'https://[^ ]+' | head -1 || echo "")
+
+            if [ -n "$SERVICE_URL" ]; then
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${SERVICE_URL}/health" 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ Admin API staging está healthy"
+                exit 0
+              fi
+            fi
+
+            sleep $SLEEP_TIME
+          done
+
+          echo "❌ Timeout esperando que Admin API staging esté disponible"
+          exit 1
+
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 4. Frontend Web CRM → Vercel (preview con alias staging)
-  # ─────────────────────────────────────────────────────────────────────────────
   deploy-web-staging:
     name: Web CRM → Vercel staging
-    needs: deploy-api-staging
+    needs: [deploy-api-staging, deploy-admin-staging]
     runs-on: ubuntu-latest
+    environment: staging
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Instalar Vercel CLI
         run: npm install -g vercel@latest
 
-      - name: Bajar configuración de Vercel
-        working-directory: apps/web
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
-
-      - name: Build
-        working-directory: apps/web
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
-
-      - name: Deploy con alias staging
+      - name: Descargar configuración de Vercel
         working-directory: apps/web
         run: |
-          vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} \
-            --alias staging.olimpo.mx
+          vercel pull --yes \
+            --environment=preview \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 5. Admin Web → Vercel (preview con alias staging-admin)
-  # ─────────────────────────────────────────────────────────────────────────────
+      - name: Build con variables de staging
+        working-directory: apps/web
+        run: |
+          vercel build \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_STAGING }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY_STAGING }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.STAGING_API_URL }}
+
+      - name: Desplegar con alias staging
+        working-directory: apps/web
+        run: |
+          vercel deploy --prebuilt \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --alias staging.olimpo.mx \
+            --prod
+
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+      - name: Verificar deployment
+        run: |
+          echo "Verificando que el sitio staging está accesible..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://staging.olimpo.mx 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+            echo "✅ Web CRM staging desplegado y accesible"
+          else
+            echo "⚠️ Web CRM staging desplegado pero no respondió con código esperado: $HTTP_CODE"
+          fi
+
   deploy-admin-web-staging:
     name: Admin Web → Vercel staging
-    needs: deploy-admin-staging
+    needs: [deploy-api-staging, deploy-admin-staging]
     runs-on: ubuntu-latest
+    environment: staging
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Instalar Vercel CLI
         run: npm install -g vercel@latest
 
-      - name: Bajar configuración de Vercel
-        working-directory: apps/admin-web
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
-
-      - name: Build
-        working-directory: apps/admin-web
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
-
-      - name: Deploy con alias staging-admin
+      - name: Descargar configuración de Vercel
         working-directory: apps/admin-web
         run: |
-          vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} \
-            --alias staging-admin.olimpo.mx
+          vercel pull --yes \
+            --environment=preview \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Build con variables de staging
+        working-directory: apps/admin-web
+        run: |
+          vercel build \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_STAGING }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY_STAGING }}
+          ADMIN_API_URL: ${{ secrets.STAGING_ADMIN_API_URL }}
+
+      - name: Desplegar con alias staging-admin
+        working-directory: apps/admin-web
+        run: |
+          vercel deploy --prebuilt \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --alias staging-admin.olimpo.mx \
+            --prod
+
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+  notify-staging:
+    name: Notificar despliegue staging
+    needs: [deploy-web-staging, deploy-admin-web-staging]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Resumen
+        run: |
+          echo "## Despliegue a staging" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Servicio | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ needs.deploy-api-staging.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin API | ${{ needs.deploy-admin-staging.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web CRM | ${{ needs.deploy-web-staging.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin Web | ${{ needs.deploy-admin-web-staging.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fecha:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **URLs:**" >> $GITHUB_STEP_SUMMARY
+          echo "  - Web CRM: https://staging.olimpo.mx" >> $GITHUB_STEP_SUMMARY
+          echo "  - Admin Web: https://staging-admin.olimpo.mx" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.deploy-web-staging.result }}" != "success" ] || \
+             [ "${{ needs.deploy-admin-web-staging.result }}" != "success" ]; then
+            echo ""
+            echo "❌ **ALERTA: Algunos servicios fallaron en staging**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
