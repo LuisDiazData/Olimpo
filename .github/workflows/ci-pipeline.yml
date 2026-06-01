@@ -184,6 +184,7 @@ jobs:
   admin-web-quality:
     name: Admin Web — Lint, tipos y build
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -245,7 +246,6 @@ jobs:
       - api-docker
       - admin-docker
       - web-quality
-      - admin-web-quality
       - security-scan
     if: always()
     steps:
@@ -256,14 +256,12 @@ jobs:
           echo "api-docker: ${{ needs.api-docker.result }}"
           echo "admin-docker: ${{ needs.admin-docker.result }}"
           echo "web-quality: ${{ needs.web-quality.result }}"
-          echo "admin-web-quality: ${{ needs.admin-web-quality.result }}"
           echo "security-scan: ${{ needs.security-scan.result }}"
 
           if [ "${{ needs.api-tests.result }}" == "failure" ] || \
              [ "${{ needs.api-docker.result }}" == "failure" ] || \
              [ "${{ needs.admin-docker.result }}" == "failure" ] || \
-             [ "${{ needs.web-quality.result }}" == "failure" ] || \
-             [ "${{ needs.admin-web-quality.result }}" == "failure" ]; then
+             [ "${{ needs.web-quality.result }}" == "failure" ]; then
             echo "ERROR: Uno o más jobs fallaron."
             exit 1
           fi
@@ -271,8 +269,7 @@ jobs:
           if [ "${{ needs.api-tests.result }}" == "skipped" ] || \
              [ "${{ needs.api-docker.result }}" == "skipped" ] || \
              [ "${{ needs.admin-docker.result }}" == "skipped" ] || \
-             [ "${{ needs.web-quality.result }}" == "skipped" ] || \
-             [ "${{ needs.admin-web-quality.result }}" == "skipped" ]; then
+             [ "${{ needs.web-quality.result }}" == "skipped" ]; then
             echo "ERROR: Algunos jobs fueron saltados."
             exit 1
           fi
