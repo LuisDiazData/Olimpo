@@ -263,7 +263,7 @@ def actualizar_usuario(
             detail="No se enviaron campos para actualizar.",
         )
 
-    if "ramos_adicionales" in cambios and cambios["ramos_adicionales"] is not None:
+    if body.ramos_adicionales is not None:
         cambios["ramos_adicionales"] = [r.value for r in body.ramos_adicionales]
 
     result = (

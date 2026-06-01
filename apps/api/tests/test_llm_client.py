@@ -13,9 +13,7 @@ def mock_settings():
         settings_instance.OPENAI_API_KEY = "test-openai-key"
         settings_instance.ANTHROPIC_API_KEY = "test-anthropic-key"
         settings_instance.RUNPOD_API_KEY = "test-runpod-key"
-        settings_instance.RUNPOD_ENDPOINT_OCR = (
-            "https://api.runpod.ai/v2/test-endpoint/run"
-        )
+        settings_instance.RUNPOD_ENDPOINT_OCR = "https://api.runpod.ai/v2/test-endpoint/run"
         mock_get.return_value = settings_instance
         yield settings_instance
 

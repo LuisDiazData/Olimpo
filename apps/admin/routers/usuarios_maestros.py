@@ -21,7 +21,7 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
-from supabase_auth.errors import AuthApiError
+from supabase import AuthApiError
 
 from core.auth import require_superadmin
 from core.crypto import descifrar_key
