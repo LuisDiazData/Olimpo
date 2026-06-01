@@ -1,4 +1,4 @@
-﻿"""
+"""
 Endpoints de sistema: salud del servicio y perfil del usuario autenticado.
 
 GET /health  â€” sin autenticaciÃ³n. Railway lo usa como health check.
@@ -20,8 +20,13 @@ router = APIRouter(tags=["sistema"])
 
 @router.get("/health", summary="Health check")
 def health() -> dict:
-    """Sin autenticaciÃ³n. Verifica que el proceso estÃ¡ activo."""
+    """Sin autenticación. Verifica que el proceso está activo."""
     return {"status": "ok", "servicio": "olimpo-api"}
+
+
+@router.get("/test-error", summary="Forzar error para verificar Sentry", include_in_schema=False)
+def test_error() -> dict:
+    raise RuntimeError("Error de prueba — Sentry funcionando correctamente.")
 
 
 @router.get(
@@ -97,4 +102,3 @@ def update_me(
 
     log.info("perfil_actualizado", usuario_id=str(usuario.id), campos=list(cambios.keys()))
     return UsuarioResponse.model_validate(result.data)
-

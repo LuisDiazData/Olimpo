@@ -41,6 +41,7 @@ _JWKS_FETCHED_AT = 0.0
 # JWKS helpers (ES256 verification for Supabase v2)
 # =============================================================================
 
+
 def _get_jwks(supabase_url: str, anon_key: str) -> dict:
     """Fetch and cache JWKS from Supabase Auth, fallback to hardcoded keys."""
     global _JWKS_CACHE, _JWKS_FETCHED_AT
@@ -51,6 +52,7 @@ def _get_jwks(supabase_url: str, anon_key: str) -> dict:
 
     try:
         import httpx
+
         resp = httpx.get(
             f"{supabase_url}/auth/v1/.well-known/jwks.json",
             headers={"apikey": anon_key},
@@ -77,9 +79,7 @@ def _build_public_key(jwk: dict) -> bytes:
 
     x_bytes = base64url_decode(jwk["x"])
     y_bytes = base64url_decode(jwk["y"])
-    public_key = EllipticCurvePublicKey.from_encoded_point(
-        SECP256R1(), b"\x04" + x_bytes + y_bytes
-    )
+    public_key = EllipticCurvePublicKey.from_encoded_point(SECP256R1(), b"\x04" + x_bytes + y_bytes)
     return public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -116,6 +116,7 @@ def _decode_jwt_es256(token: str, supabase_url: str, anon_key: str) -> dict:
 # =============================================================================
 # MECANISMO 1: JWT de Supabase (usuarios humanos)
 # =============================================================================
+
 
 def _decode_jwt(token: str) -> dict:
     """Decodifica y valida la firma del JWT de Supabase. Lanza HTTPException si es inválido."""
@@ -207,6 +208,7 @@ def require_roles(*roles: RolUsuario):
     Uso:
         @router.get("/admin", dependencies=[Depends(require_roles(RolUsuario.director_general))])
     """
+
     def _check(usuario: UsuarioToken = Depends(get_current_user)) -> UsuarioToken:
         if usuario.rol not in roles:
             raise HTTPException(
@@ -214,12 +216,14 @@ def require_roles(*roles: RolUsuario):
                 detail=f"Acceso denegado. Roles requeridos: {[r.value for r in roles]}",
             )
         return usuario
+
     return _check
 
 
 # =============================================================================
 # MECANISMO 2: API key para agentes externos (MCP, n8n, integraciones)
 # =============================================================================
+
 
 def get_agent_token(
     api_key: str | None = Depends(_api_key_header),
@@ -246,6 +250,7 @@ def get_agent_token(
 
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     from core.database import get_admin_db
+
     db = get_admin_db()
 
     result = db.rpc("validar_agent_api_key", {"p_key_hash": key_hash}).execute()
@@ -291,6 +296,7 @@ def get_agent_token(
 # PERMISOS GRANULARES
 # =============================================================================
 
+
 def require_permiso(clave: str):
     """
     Dependencia de fábrica que valida un permiso granular del usuario autenticado.
@@ -303,8 +309,10 @@ def require_permiso(clave: str):
     El permiso se evalúa en el cliente admin (service_role) para evitar que RLS
     sobre las tablas de permisos bloquee la verificación.
     """
+
     def _check(caller: UsuarioToken = Depends(get_current_user)) -> UsuarioToken:
         from core.database import get_admin_db
+
         admin = get_admin_db()
         result = admin.rpc(
             "tiene_permiso",
@@ -320,6 +328,7 @@ def require_permiso(clave: str):
                 },
             )
         return caller
+
     return _check
 
 

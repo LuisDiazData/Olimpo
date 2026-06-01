@@ -123,7 +123,10 @@ class UsuarioCreate(BaseModel):
     def validar_ramo_segun_rol(self) -> "UsuarioCreate":
         if self.rol in (RolUsuario.gerente, RolUsuario.analista) and self.ramo is None:
             raise ValueError(f"El rol '{self.rol}' requiere al menos un ramo principal.")
-        if self.rol in (RolUsuario.director_general, RolUsuario.director_ops) and self.ramo is not None:
+        if (
+            self.rol in (RolUsuario.director_general, RolUsuario.director_ops)
+            and self.ramo is not None
+        ):
             raise ValueError(f"El rol '{self.rol}' no puede tener ramo asignado.")
         return self
 

@@ -4,15 +4,18 @@ Tests de regresión — Capa 1 (sin DB).
 Verifica que los bugs identificados y corregidos durante el desarrollo
 no vuelvan a aparecer. Cada test está vinculado a un fix específico.
 """
+
 import inspect
 
 # ---------------------------------------------------------------------------
 # Regresión 1: Importación de todos los routers sin errores
 # ---------------------------------------------------------------------------
 
+
 def test_from_main_import_app_no_lanza_excepcion():
     """from main import app debe completar sin ImportError ni ValidationError."""
     from main import app  # noqa: F401 — solo verificamos que importa
+
     assert app is not None
 
 
@@ -27,7 +30,7 @@ def test_los_12_routers_estan_registrados():
             tags_registrados.update(route.tags)
 
     tags_esperados = {
-        "sistema",      # health.router usa tags=["sistema"]
+        "sistema",  # health.router usa tags=["sistema"]
         "usuarios",
         "agentes",
         "asignaciones",
@@ -50,9 +53,11 @@ def test_los_12_routers_estan_registrados():
 # El fix fue usar get_user_db(usuario.access_token) correctamente.
 # ---------------------------------------------------------------------------
 
+
 def test_asignaciones_router_importa_sin_error():
     """from routers.asignaciones import router no debe lanzar ImportError."""
     from routers.asignaciones import router  # noqa: F401
+
     assert router is not None
 
 
@@ -76,6 +81,7 @@ def test_asignaciones_usa_get_user_db_no_get_db():
 # como usuario: UsuarioToken = Depends(get_current_user) en la firma — el JWT
 # se decodificaba dos veces.
 # ---------------------------------------------------------------------------
+
 
 def test_desvincular_correo_tramite_no_tiene_doble_auth():
     """
@@ -104,8 +110,10 @@ def test_desvincular_correo_tramite_tiene_parametros_correctos():
 # Regresión 4: Modelos clave importan correctamente
 # ---------------------------------------------------------------------------
 
+
 def test_pagination_model_importa():
     from models.pagination import PaginatedResponse
+
     assert PaginatedResponse is not None
 
 
@@ -114,17 +122,20 @@ def test_tramite_models_importan():
         TRANSICIONES_VALIDAS,
         EstadoTramite,
     )
+
     assert len(TRANSICIONES_VALIDAS) == len(EstadoTramite)
 
 
 def test_asignacion_model_importa():
     from models.asignacion import AsignacionCreate, ResolverAsignacionResponse
+
     assert AsignacionCreate is not None
     assert ResolverAsignacionResponse is not None
 
 
 def test_usuario_model_importa():
     from models.usuario import RamoUsuario, RolUsuario
+
     assert len(list(RolUsuario)) == 4
     assert len(list(RamoUsuario)) == 4
 
@@ -133,9 +144,11 @@ def test_usuario_model_importa():
 # Regresión 5: TramiteResponse incluye transiciones_disponibles
 # ---------------------------------------------------------------------------
 
+
 def test_tramite_response_tiene_transiciones_disponibles():
     """TramiteResponse debe tener el campo transiciones_disponibles para compatibilidad MCP."""
     from models.tramite import TramiteResponse
+
     campos = TramiteResponse.model_fields
     assert "transiciones_disponibles" in campos
 
@@ -143,6 +156,7 @@ def test_tramite_response_tiene_transiciones_disponibles():
 def test_cambiar_estado_body_tiene_motivo():
     """CambiarEstadoBody debe tener el campo 'motivo' para pendiente_documentos."""
     from models.tramite import CambiarEstadoBody
+
     campos = CambiarEstadoBody.model_fields
     assert "motivo" in campos
     assert "motivo_rechazo_gnp" in campos

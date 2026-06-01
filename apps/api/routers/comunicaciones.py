@@ -43,10 +43,11 @@ router = APIRouter(prefix="/comunicaciones", tags=["comunicaciones"])
 # HELPERS
 # =============================================================================
 
+
 def _get_comunicacion_o_404(db, comunicacion_id: UUID) -> dict:
-    result = db.table("comunicacion").select("*").eq(
-        "id", str(comunicacion_id)
-    ).maybe_single().execute()
+    result = (
+        db.table("comunicacion").select("*").eq("id", str(comunicacion_id)).maybe_single().execute()
+    )
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -67,6 +68,7 @@ def _join_comunicacion(com: dict) -> dict:
 # GET /comunicaciones
 # =============================================================================
 
+
 @router.get("", response_model=list[ComunicacionListItem])
 def listar_comunicaciones(
     tramite_id: UUID | None = Query(default=None, description="Filtrar por trámite"),
@@ -82,10 +84,14 @@ def listar_comunicaciones(
     """
     Lista comunicaciones con filtros. Visible para todo el equipo.
     """
-    query = db.table("comunicacion").select(
-        "id, medio, nota, tramite_id, agente_id, "
-        "comunicacion_entrante, requiere_seguimiento, created_at"
-    ).eq("eliminado", False)
+    query = (
+        db.table("comunicacion")
+        .select(
+            "id, medio, nota, tramite_id, agente_id, "
+            "comunicacion_entrante, requiere_seguimiento, created_at"
+        )
+        .eq("eliminado", False)
+    )
 
     if tramite_id:
         query = query.eq("tramite_id", str(tramite_id))
@@ -101,16 +107,28 @@ def listar_comunicaciones(
     result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
 
     items = []
-    for com in (result.data or []):
+    for com in result.data or []:
         item = dict(com)
         item["tramite_folio"] = None
         if item.get("tramite_id"):
-            t = db.table("tramite").select("folio").eq("id", item["tramite_id"]).maybe_single().execute()
+            t = (
+                db.table("tramite")
+                .select("folio")
+                .eq("id", item["tramite_id"])
+                .maybe_single()
+                .execute()
+            )
             if t.data:
                 item["tramite_folio"] = t.data["folio"]
         item["agente_nombre"] = None
         if item.get("agente_id"):
-            a = db.table("agente").select("nombre").eq("id", item["agente_id"]).maybe_single().execute()
+            a = (
+                db.table("agente")
+                .select("nombre")
+                .eq("id", item["agente_id"])
+                .maybe_single()
+                .execute()
+            )
             if a.data:
                 item["agente_nombre"] = a.data["nombre"]
         items.append(ComunicacionListItem.model_validate(item))
@@ -121,6 +139,7 @@ def listar_comunicaciones(
 # =============================================================================
 # POST /comunicaciones
 # =============================================================================
+
 
 @router.post(
     "",
@@ -182,6 +201,7 @@ def crear_comunicacion(
 # GET /comunicaciones/{id}
 # =============================================================================
 
+
 @router.get("/{comunicacion_id}", response_model=ComunicacionResponse)
 def obtener_comunicacion(
     comunicacion_id: UUID,
@@ -193,7 +213,10 @@ def obtener_comunicacion(
     if com.get("eliminado"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "COMUNICACION_NO_ENCONTRADA", "mensaje": "Comunicación no encontrada."},
+            detail={
+                "error_code": "COMUNICACION_NO_ENCONTRADA",
+                "mensaje": "Comunicación no encontrada.",
+            },
         )
     return _enriquecer_comunicacion(com, db)
 
@@ -201,6 +224,7 @@ def obtener_comunicacion(
 # =============================================================================
 # PATCH /comunicaciones/{id}
 # =============================================================================
+
 
 @router.patch("/{comunicacion_id}", response_model=ComunicacionResponse)
 def actualizar_comunicacion(
@@ -247,6 +271,7 @@ def actualizar_comunicacion(
 # DELETE /comunicaciones/{id}
 # =============================================================================
 
+
 @router.delete("/{comunicacion_id}", status_code=status.HTTP_200_OK)
 def eliminar_comunicacion(
     comunicacion_id: UUID,
@@ -282,6 +307,7 @@ def eliminar_comunicacion(
 # POST /comunicaciones/marcar-seguimiento
 # =============================================================================
 
+
 @router.post(
     "/marcar-seguimiento",
     status_code=status.HTTP_200_OK,
@@ -299,9 +325,9 @@ def marcar_seguimiento_multiple(
     """Marca/desmarca seguimiento en varias comunicaciones."""
     ids_str = [str(id) for id in body.comunicacion_ids]
 
-    db.table("comunicacion").update(
-        {"requiere_seguimiento": body.requiere_seguimiento}
-    ).in_("id", ids_str).execute()
+    db.table("comunicacion").update({"requiere_seguimiento": body.requiere_seguimiento}).in_(
+        "id", ids_str
+    ).execute()
 
     log.info(
         "comunicaciones_marcar_seguimiento",
@@ -320,9 +346,16 @@ def marcar_seguimiento_multiple(
 # HELPERS INTERNOS
 # =============================================================================
 
+
 def _enriquecer_comunicacion(com: dict, db) -> ComunicacionResponse:
     """Agrega nombres relacionados a una comunicación."""
     if com.get("usuario_id"):
-        u = db.table("usuario").select("nombre").eq("id", com["usuario_id"]).maybe_single().execute()
+        u = (
+            db.table("usuario")
+            .select("nombre")
+            .eq("id", com["usuario_id"])
+            .maybe_single()
+            .execute()
+        )
         com["usuario_nombre"] = u.data["nombre"] if u.data else None
     return ComunicacionResponse.model_validate(com)

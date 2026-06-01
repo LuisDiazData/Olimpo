@@ -6,6 +6,7 @@ Cubre:
   - Lógica de _enriquecer_tramite (transiciones_disponibles, campos relacionales)
   - Validaciones del endpoint cambiar-estado: transición inválida, motivos requeridos
 """
+
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from routers.tramites import _enriquecer_tramite
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _tramite_fake(estado: str) -> dict:
     return {
@@ -47,6 +49,7 @@ def _base_enriquecer(estado: str) -> dict:
 # TRANSICIONES_VALIDAS — integridad del grafo
 # ---------------------------------------------------------------------------
 
+
 class TestTransicionesValidas:
     def test_todos_los_estados_estan_en_el_dict(self):
         for estado in EstadoTramite:
@@ -65,10 +68,16 @@ class TestTransicionesValidas:
         estados_validos = set(EstadoTramite)
         for estado, destinos in TRANSICIONES_VALIDAS.items():
             for destino in destinos:
-                assert destino in estados_validos, f"Destino desconocido: '{destino}' desde '{estado}'"
+                assert destino in estados_validos, (
+                    f"Destino desconocido: '{destino}' desde '{estado}'"
+                )
 
     def test_no_hay_ciclos_simples_en_terminales(self):
-        for estado_terminal in [EstadoTramite.completado, EstadoTramite.rechazado_gnp, EstadoTramite.cancelado]:
+        for estado_terminal in [
+            EstadoTramite.completado,
+            EstadoTramite.rechazado_gnp,
+            EstadoTramite.cancelado,
+        ]:
             assert EstadoTramite.recibido not in TRANSICIONES_VALIDAS[estado_terminal]
 
     def test_pendiente_documentos_agente_puede_volver_a_en_revision(self):
@@ -84,6 +93,7 @@ class TestTransicionesValidas:
 # ---------------------------------------------------------------------------
 # _enriquecer_tramite — lógica de transformación
 # ---------------------------------------------------------------------------
+
 
 class TestEnriquecerTramite:
     def test_transiciones_desde_recibido(self):
@@ -105,12 +115,18 @@ class TestEnriquecerTramite:
     def test_transiciones_desde_en_revision(self):
         data = _enriquecer_tramite(_base_enriquecer("en_revision"))
         assert set(data["transiciones_disponibles"]) == {
-            "pendiente_documentos_agente", "turnado_a_gnp", "escalado"
+            "pendiente_documentos_agente",
+            "turnado_a_gnp",
+            "escalado",
         }
 
     def test_transiciones_desde_turnado_a_gnp(self):
         data = _enriquecer_tramite(_base_enriquecer("turnado_a_gnp"))
-        assert set(data["transiciones_disponibles"]) == {"activado_gnp", "completado", "rechazado_gnp"}
+        assert set(data["transiciones_disponibles"]) == {
+            "activado_gnp",
+            "completado",
+            "rechazado_gnp",
+        }
 
     def test_estado_invalido_retorna_transiciones_vacias(self):
         data = _enriquecer_tramite(_base_enriquecer("estado_inventado"))
@@ -143,6 +159,7 @@ class TestEnriquecerTramite:
 # ---------------------------------------------------------------------------
 # Endpoint POST /tramites/{id}/cambiar-estado — validaciones sin DB real
 # ---------------------------------------------------------------------------
+
 
 def test_cambiar_estado_transicion_invalida_retorna_422(client_analista, monkeypatch):
     """recibido → completado es una transición inválida; debe devolver TRANSICION_INVALIDA."""

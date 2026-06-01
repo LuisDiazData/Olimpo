@@ -29,9 +29,7 @@ from models.usuario import RamoUsuario, RolUsuario, UsuarioToken
 log = structlog.get_logger(__name__)
 router = APIRouter(tags=["slas"])
 
-_SOLO_DIRECTORES = [
-    Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))
-]
+_SOLO_DIRECTORES = [Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))]
 _CONFIGURAR_SLAS = _SOLO_DIRECTORES + [Depends(require_permiso("slas.configurar"))]
 
 
@@ -39,9 +37,11 @@ _CONFIGURAR_SLAS = _SOLO_DIRECTORES + [Depends(require_permiso("slas.configurar"
 # Modelos — sla_definicion
 # ---------------------------------------------------------------------------
 
+
 class SlaDefinicionCreate(BaseModel):
     nombre: str = Field(
-        min_length=2, max_length=200,
+        min_length=2,
+        max_length=200,
         description='Nombre descriptivo visible en la UI. Ej: "Alta GMM urgente".',
     )
     descripcion: str | None = Field(default=None, max_length=1000)
@@ -58,12 +58,14 @@ class SlaDefinicionCreate(BaseModel):
         description="Prioridad a la que aplica. NULL = aplica a todas las prioridades.",
     )
     dias_habiles: int = Field(
-        ge=1, le=365,
+        ge=1,
+        le=365,
         description="Plazo en días hábiles (excluye fines de semana y días inhábiles configurados).",
     )
     alerta_porcentaje: Decimal = Field(
         default=Decimal("80"),
-        ge=1, lt=100,
+        ge=1,
+        lt=100,
         description=(
             "Porcentaje del plazo consumido al que se dispara la alerta preventiva. "
             "Ej: 80 → alerta cuando se ha usado el 80% del tiempo disponible."
@@ -100,10 +102,12 @@ class SlaDefinicionResponse(BaseModel):
 # Modelos — dia_inhabil
 # ---------------------------------------------------------------------------
 
+
 class DiaInhabilCreate(BaseModel):
     fecha: date = Field(description="Fecha del día no laborable (YYYY-MM-DD).")
     descripcion: str = Field(
-        min_length=2, max_length=200,
+        min_length=2,
+        max_length=200,
         description='Motivo del día inhábil. Ej: "Día de la Independencia".',
     )
     aplica_ramo: RamoUsuario | None = Field(
@@ -133,14 +137,13 @@ class DiaInhabilResponse(BaseModel):
 # Modelos — estado SLA de un trámite
 # ---------------------------------------------------------------------------
 
+
 class SlaTramiteStatus(BaseModel):
     tramite_id: UUID
     sla_tramite_id: UUID | None = Field(
         description="UUID del registro sla_tramite. NULL si el trámite no tiene SLA activo."
     )
-    sla_nombre: str | None = Field(
-        description="Nombre de la definición de SLA aplicada."
-    )
+    sla_nombre: str | None = Field(description="Nombre de la definición de SLA aplicada.")
     estado: str | None = Field(
         description="Estado interno: en_curso, cumplido, incumplido, pausado."
     )
@@ -173,6 +176,7 @@ class SlaTramiteStatus(BaseModel):
 # GET /slas/definiciones
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/slas/definiciones",
     response_model=list[SlaDefinicionResponse],
@@ -182,7 +186,9 @@ class SlaTramiteStatus(BaseModel):
 async def listar_sla_definiciones(
     ramo: RamoUsuario | None = Query(default=None),
     tipo_tramite: TipoTramite | None = Query(default=None),
-    solo_activos: bool = Query(default=True, description="False para incluir definiciones desactivadas."),
+    solo_activos: bool = Query(
+        default=True, description="False para incluir definiciones desactivadas."
+    ),
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> list[SlaDefinicionResponse]:
     db = get_user_db(usuario.access_token)
@@ -202,6 +208,7 @@ async def listar_sla_definiciones(
 # ---------------------------------------------------------------------------
 # POST /slas/definiciones
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/slas/definiciones",
@@ -229,15 +236,24 @@ async def crear_sla_definicion(
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error_code": "ERROR_CREAR_SLA", "mensaje": "No se pudo crear la definición de SLA."},
+            detail={
+                "error_code": "ERROR_CREAR_SLA",
+                "mensaje": "No se pudo crear la definición de SLA.",
+            },
         )
-    log.info("sla_definicion_creada", nombre=body.nombre, tipo=getattr(body.tipo_tramite, "value", None), por=str(usuario.id))
+    log.info(
+        "sla_definicion_creada",
+        nombre=body.nombre,
+        tipo=getattr(body.tipo_tramite, "value", None),
+        por=str(usuario.id),
+    )
     return SlaDefinicionResponse.model_validate(result.data[0])
 
 
 # ---------------------------------------------------------------------------
 # PATCH /slas/definiciones/{id}
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/slas/definiciones/{sla_id}",
@@ -260,7 +276,10 @@ async def actualizar_sla_definicion(
     if not cambios:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error_code": "SIN_CAMBIOS", "mensaje": "No se enviaron campos para actualizar."},
+            detail={
+                "error_code": "SIN_CAMBIOS",
+                "mensaje": "No se enviaron campos para actualizar.",
+            },
         )
 
     for k, v in cambios.items():
@@ -268,24 +287,29 @@ async def actualizar_sla_definicion(
             cambios[k] = float(v)
 
     result = (
-        admin.table("sla_definicion")
-        .update(cambios)
-        .eq("id", str(sla_id))
-        .select("*")
-        .execute()
+        admin.table("sla_definicion").update(cambios).eq("id", str(sla_id)).select("*").execute()
     )
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "SLA_NO_ENCONTRADO", "mensaje": "Definición de SLA no encontrada."},
+            detail={
+                "error_code": "SLA_NO_ENCONTRADO",
+                "mensaje": "Definición de SLA no encontrada.",
+            },
         )
-    log.info("sla_definicion_actualizada", sla_id=str(sla_id), campos=list(cambios.keys()), por=str(usuario.id))
+    log.info(
+        "sla_definicion_actualizada",
+        sla_id=str(sla_id),
+        campos=list(cambios.keys()),
+        por=str(usuario.id),
+    )
     return SlaDefinicionResponse.model_validate(result.data[0])
 
 
 # ---------------------------------------------------------------------------
 # DELETE /slas/definiciones/{id}  — soft-delete
 # ---------------------------------------------------------------------------
+
 
 @router.delete(
     "/slas/definiciones/{sla_id}",
@@ -302,16 +326,14 @@ async def desactivar_sla_definicion(
     usuario: UsuarioToken = Depends(get_current_user),
     admin=Depends(get_admin_db_dep),
 ) -> None:
-    result = (
-        admin.table("sla_definicion")
-        .update({"activo": False})
-        .eq("id", str(sla_id))
-        .execute()
-    )
+    result = admin.table("sla_definicion").update({"activo": False}).eq("id", str(sla_id)).execute()
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "SLA_NO_ENCONTRADO", "mensaje": "Definición de SLA no encontrada."},
+            detail={
+                "error_code": "SLA_NO_ENCONTRADO",
+                "mensaje": "Definición de SLA no encontrada.",
+            },
         )
     log.info("sla_definicion_desactivada", sla_id=str(sla_id), por=str(usuario.id))
 
@@ -319,6 +341,7 @@ async def desactivar_sla_definicion(
 # ---------------------------------------------------------------------------
 # GET /slas/preview  — ¿qué SLA aplicaría?
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/slas/preview",
@@ -361,6 +384,7 @@ async def preview_sla(
 # GET /slas/dias-inhabiles
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/slas/dias-inhabiles",
     response_model=list[DiaInhabilResponse],
@@ -369,7 +393,9 @@ async def preview_sla(
 )
 async def listar_dias_inhabiles(
     anio: int | None = Query(default=None, description="Filtrar por año (ej: 2026)."),
-    aplica_ramo: RamoUsuario | None = Query(default=None, description="Filtrar por ramo. NULL = ver todos."),
+    aplica_ramo: RamoUsuario | None = Query(
+        default=None, description="Filtrar por ramo. NULL = ver todos."
+    ),
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> list[DiaInhabilResponse]:
     db = get_user_db(usuario.access_token)
@@ -377,11 +403,7 @@ async def listar_dias_inhabiles(
 
     if anio:
         # Filtrar por año usando rango de fechas
-        query = (
-            query
-            .gte("fecha", f"{anio}-01-01")
-            .lte("fecha", f"{anio}-12-31")
-        )
+        query = query.gte("fecha", f"{anio}-01-01").lte("fecha", f"{anio}-12-31")
     if aplica_ramo:
         query = query.eq("aplica_ramo", aplica_ramo.value)
 
@@ -392,6 +414,7 @@ async def listar_dias_inhabiles(
 # ---------------------------------------------------------------------------
 # POST /slas/dias-inhabiles
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/slas/dias-inhabiles",
@@ -432,15 +455,24 @@ async def crear_dia_inhabil(
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error_code": "ERROR_CREAR_DIA_INHABIL", "mensaje": "No se pudo registrar el día inhábil."},
+            detail={
+                "error_code": "ERROR_CREAR_DIA_INHABIL",
+                "mensaje": "No se pudo registrar el día inhábil.",
+            },
         )
-    log.info("dia_inhabil_creado", fecha=body.fecha.isoformat(), ramo=getattr(body.aplica_ramo, "value", None), por=str(usuario.id))
+    log.info(
+        "dia_inhabil_creado",
+        fecha=body.fecha.isoformat(),
+        ramo=getattr(body.aplica_ramo, "value", None),
+        por=str(usuario.id),
+    )
     return DiaInhabilResponse.model_validate(result.data[0])
 
 
 # ---------------------------------------------------------------------------
 # PATCH /slas/dias-inhabiles/{id}
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/slas/dias-inhabiles/{dia_id}",
@@ -461,20 +493,20 @@ async def actualizar_dia_inhabil(
     if not cambios:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error_code": "SIN_CAMBIOS", "mensaje": "No se enviaron campos para actualizar."},
+            detail={
+                "error_code": "SIN_CAMBIOS",
+                "mensaje": "No se enviaron campos para actualizar.",
+            },
         )
 
-    result = (
-        admin.table("dia_inhabil")
-        .update(cambios)
-        .eq("id", str(dia_id))
-        .select("*")
-        .execute()
-    )
+    result = admin.table("dia_inhabil").update(cambios).eq("id", str(dia_id)).select("*").execute()
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "DIA_INHABIL_NO_ENCONTRADO", "mensaje": "Día inhábil no encontrado."},
+            detail={
+                "error_code": "DIA_INHABIL_NO_ENCONTRADO",
+                "mensaje": "Día inhábil no encontrado.",
+            },
         )
     return DiaInhabilResponse.model_validate(result.data[0])
 
@@ -482,6 +514,7 @@ async def actualizar_dia_inhabil(
 # ---------------------------------------------------------------------------
 # DELETE /slas/dias-inhabiles/{id}
 # ---------------------------------------------------------------------------
+
 
 @router.delete(
     "/slas/dias-inhabiles/{dia_id}",
@@ -494,16 +527,14 @@ async def eliminar_dia_inhabil(
     usuario: UsuarioToken = Depends(get_current_user),
     admin=Depends(get_admin_db_dep),
 ) -> None:
-    result = (
-        admin.table("dia_inhabil")
-        .delete()
-        .eq("id", str(dia_id))
-        .execute()
-    )
+    result = admin.table("dia_inhabil").delete().eq("id", str(dia_id)).execute()
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "DIA_INHABIL_NO_ENCONTRADO", "mensaje": "Día inhábil no encontrado."},
+            detail={
+                "error_code": "DIA_INHABIL_NO_ENCONTRADO",
+                "mensaje": "Día inhábil no encontrado.",
+            },
         )
     log.info("dia_inhabil_eliminado", dia_id=str(dia_id), por=str(usuario.id))
 
@@ -511,6 +542,7 @@ async def eliminar_dia_inhabil(
 # ---------------------------------------------------------------------------
 # GET /tramites/{id}/sla
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/tramites/{tramite_id}/sla",

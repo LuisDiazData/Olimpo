@@ -4,19 +4,61 @@ on:
   push:
     branches: [main]
 
-# Solo un despliegue a producción a la vez; nunca cancelar en progreso
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 1. Migraciones de base de datos — requiere aprobación manual (env: production)
-  # ─────────────────────────────────────────────────────────────────────────────
+  preflight:
+    name: Preflight — Validar ambiente
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.olimpo.mx
+    outputs:
+      is_main_branch: ${{ steps.check.outputs.is_main }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        name: Verificar rama y contexto
+        run: |
+          echo "Ref: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Actor: ${{ github.actor }}"
+
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "is_main=true" >> $GITHUB_OUTPUT
+            echo "✅ Despliegue a producción aprobado para main"
+          else
+            echo "is_main=false" >> $GITHUB_OUTPUT
+            echo "❌ Este workflow solo se dispara en main"
+            exit 1
+          fi
+
+      - name: Advertir sobre producción
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  ATENCIÓN: Este workflow despliega a PRODUCCIÓN"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Proyecto: Olimpo CRM"
+          echo "Rama: main"
+          echo "Commit: ${{ github.sha }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Fecha: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
   migrate-prod:
     name: Supabase — Migraciones producción
+    needs: preflight
     runs-on: ubuntu-latest
-    environment: production   # ← pausa aquí hasta que un reviewer apruebe
+    environment:
+      name: production
+      url: https://app.olimpo.mx
     steps:
       - uses: actions/checkout@v4
 
@@ -27,143 +69,322 @@ jobs:
       - name: Enlazar directorio de migraciones
         run: ln -sf $GITHUB_WORKSPACE/infra/supabase/migrations $GITHUB_WORKSPACE/supabase/migrations
 
-      - name: Aplicar migraciones pendientes
-        run: supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
+      - name: Verificar conexión a Supabase
+        run: |
+          echo "Verificando conexión a Supabase production..."
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
+
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 2. API FastAPI → Railway (production)
-  # ─────────────────────────────────────────────────────────────────────────────
+      - name: Aplicar migraciones pendientes
+        run: |
+          echo "Aplicando migraciones a producción..."
+          echo "⚠️  Ejecutando en modo --dry-run primero para verificar..."
+          supabase db push \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }} \
+            --db-password ${{ secrets.SUPABASE_DB_PASSWORD_PROD }} \
+            --dry-run
+
+      - name: Aplicar migraciones (confirmado)
+        if: success()
+        run: |
+          echo "Aplicando migraciones definitivamente..."
+          supabase db push \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }} \
+            --db-password ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
+
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
   deploy-api-prod:
     name: API → Railway producción
     needs: migrate-prod
     runs-on: ubuntu-latest
-    environment: production
+    environment:
+      name: production
+      url: https://api.olimpo.mx
     steps:
       - uses: actions/checkout@v4
 
       - name: Instalar Railway CLI
         run: npm install -g @railway/cli@latest
 
-      - name: Desplegar API
+      - name: Login en Railway
+        run: railway login --token=${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Desplegar API a producción
         working-directory: apps/api
-        run: railway up --service olimpo-api --environment production --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "Desplegando API a Railway producción..."
+          railway up --service olimpo-api --environment production --detach
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 3. Admin API → Railway (production)
-  # ─────────────────────────────────────────────────────────────────────────────
-  deploy-admin-prod:
+      - name: Esperar y verificar health check
+        run: |
+          echo "Esperando que API producción esté healthy..."
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+          SLEEP_TIME=10
+
+          API_URL="https://api.olimpo.mx"
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] Verificando ${API_URL}/health..."
+
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 15 \
+              --retry 3 \
+              --retry-delay 5 \
+              "${API_URL}/health" 2>/dev/null || echo "000")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ API producción está healthy en ${API_URL}/health"
+              exit 0
+            fi
+
+            echo "   Respuesta: $HTTP_CODE (esperando ${SLEEP_TIME}s)..."
+            sleep $SLEEP_TIME
+          done
+
+          echo "❌ Timeout: API producción no respondío correctamente"
+          echo "   Última respuesta HTTP: $HTTP_CODE"
+          exit 1
+
+      - name: Verificar endpoints críticos
+        run: |
+          echo "Verificando endpoints críticos del API..."
+          ENDPOINTS=("/health" "/docs" "/openapi.json")
+
+          for endpoint in "${ENDPOINTS[@]}"; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 10 \
+              "https://api.olimpo.mx${endpoint}" 2>/dev/null || echo "000")
+
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+              echo "   ✅ ${endpoint}: $HTTP_CODE"
+            else
+              echo "   ⚠️  ${endpoint}: $HTTP_CODE"
+            fi
+          done
+
+  deploy-admin-api-prod:
     name: Admin API → Railway producción
-    needs: migrate-prod
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Instalar Railway CLI
-        run: npm install -g @railway/cli@latest
-
-      - name: Desplegar Admin API
-        working-directory: apps/admin
-        run: railway up --service olimpo-admin --environment production --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 4. Frontend Web CRM → Vercel (producción)
-  # ─────────────────────────────────────────────────────────────────────────────
-  deploy-web-prod:
-    name: Web CRM → Vercel producción
     needs: deploy-api-prod
     runs-on: ubuntu-latest
-    environment: production
+    environment:
+      name: production
+      url: https://api-admin.olimpo.mx
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Railway CLI
+        run: npm install -g @railway/cli@latest
+
+      - name: Login en Railway
+        run: railway login --token=${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Desplegar Admin API a producción
+        working-directory: apps/admin
+        run: |
+          echo "Desplegando Admin API a Railway producción..."
+          railway up --service olimpo-admin --environment production --detach
+
+      - name: Esperar y verificar health check
+        run: |
+          echo "Esperando que Admin API producción esté healthy..."
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+          SLEEP_TIME=10
+
+          ADMIN_API_URL="https://api-admin.olimpo.mx"
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] Verificando ${ADMIN_API_URL}/health..."
+
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 15 \
+              --retry 3 \
+              --retry-delay 5 \
+              "${ADMIN_API_URL}/health" 2>/dev/null || echo "000")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Admin API producción está healthy"
+              exit 0
+            fi
+
+            sleep $SLEEP_TIME
+          done
+
+          echo "❌ Timeout: Admin API producción no respondío correctamente"
+          exit 1
+
+  deploy-web-prod:
+    name: Web CRM → Vercel producción
+    needs: deploy-admin-api-prod
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.olimpo.mx
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Instalar Vercel CLI
         run: npm install -g vercel@latest
 
-      - name: Bajar configuración de Vercel
+      - name: Descargar configuración de Vercel
         working-directory: apps/web
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel pull --yes \
+            --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
 
       - name: Build producción
         working-directory: apps/web
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel build --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_PROD }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD }}
+          NEXT_PUBLIC_API_URL: https://api.olimpo.mx
 
-      - name: Deploy producción
+      - name: Deployment producción
         working-directory: apps/web
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel deploy --prebuilt --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 5. Admin Web → Vercel (producción)
-  # ─────────────────────────────────────────────────────────────────────────────
+      - name: Verificar sitio producción
+        run: |
+          echo "Verificando Web CRM producción..."
+          sleep 10
+
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            "https://app.olimpo.mx" 2>/dev/null || echo "000")
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Web CRM producción accesible"
+          elif [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+            echo "✅ Web CRM producción accesible (redirect: $HTTP_CODE)"
+          else
+            echo "⚠️ Web CRM producción respondió: $HTTP_CODE"
+          fi
+
   deploy-admin-web-prod:
     name: Admin Web → Vercel producción
-    needs: deploy-admin-prod
+    needs: deploy-admin-api-prod
     runs-on: ubuntu-latest
-    environment: production
+    environment:
+      name: production
+      url: https://admin.olimpo.mx
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Instalar Vercel CLI
         run: npm install -g vercel@latest
 
-      - name: Bajar configuración de Vercel
+      - name: Descargar configuración de Vercel
         working-directory: apps/admin-web
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel pull --yes \
+            --environment=production \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
 
       - name: Build producción
         working-directory: apps/admin-web
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel build --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL_PROD }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD }}
+          ADMIN_API_URL: https://api-admin.olimpo.mx
 
-      - name: Deploy producción
+      - name: Deployment producción
         working-directory: apps/admin-web
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel deploy --prebuilt --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 6. Notificación final
-  # ─────────────────────────────────────────────────────────────────────────────
-  notify-deploy:
-    name: Notificar despliegue exitoso
+  post-deploy:
+    name: Post-deploy — Verificación final
     needs: [deploy-web-prod, deploy-admin-web-prod]
     runs-on: ubuntu-latest
-    if: success()
+    if: always()
     steps:
       - name: Resumen del despliegue
         run: |
-          echo "## Despliegue a producción completado" >> $GITHUB_STEP_SUMMARY
+          echo "## Despliegue a Producción — Resultado" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Por:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Servicio | Estado | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| Supabase Migrations | ${{ needs.migrate-prod.result }} | — |" >> $GITHUB_STEP_SUMMARY
+          echo "| API (Railway) | ${{ needs.deploy-api-prod.result }} | https://api.olimpo.mx |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin API (Railway) | ${{ needs.deploy-admin-api-prod.result }} | https://api-admin.olimpo.mx |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web CRM (Vercel) | ${{ needs.deploy-web-prod.result }} | https://app.olimpo.mx |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin Web (Vercel) | ${{ needs.deploy-admin-web-prod.result }} | https://admin.olimpo.mx |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Metadata" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Fecha:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pipeline:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.deploy-web-prod.result }}" != "success" ] || \
+             [ "${{ needs.deploy-admin-web-prod.result }}" != "success" ]; then
+            echo ""
+            echo "❌ **ALERTA: Despliegue a producción falló**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Acciones de Rollback" >> $GITHUB_STEP_SUMMARY
+            echo "1. **Railway:** Ve al dashboard y revert a un deployment anterior" >> $GITHUB_STEP_SUMMARY
+            echo "2. **Vercel:** Usa \`vercel rollback\` o el dashboard de Vercel" >> $GITHUB_STEP_SUMMARY
+            echo "3. **Supabase:** Restaura desde un backup si las migraciones causaron problemas" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Notificar a Slack en caso de falla
+        if: needs.deploy-web-prod.result == 'failure' || needs.deploy-admin-web-prod.result == 'failure'
+        run: |
+          echo "Enviando notificación de falla..."
+          # Aquí iría la integración con Slack webhook si está configurada
+          # slack webhook URL: secrets.SLACK_WEBHOOK_URL
+          echo "Falla detectada — revisar GitHub Actions para detalles"
+
+      - name: Exit con error si falló
+        if: needs.deploy-web-prod.result == 'failure' || needs.deploy-admin-web-prod.result == 'failure'
+        run: |
+          echo "Despliegue a producción falló."
+          echo "Revisa los logs en: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          exit 1

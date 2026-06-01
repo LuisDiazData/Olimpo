@@ -32,6 +32,7 @@ class RolAsegurado(StrEnum):
 # Asegurado
 # ---------------------------------------------------------------------------
 
+
 class AseguradoCreate(BaseModel):
     nombre: str = Field(min_length=2, max_length=200)
     tipo: TipoPersona | None = None
@@ -102,6 +103,7 @@ class AseguradoListItem(BaseModel):
 # ---------------------------------------------------------------------------
 # Búsqueda/creación inteligente de asegurado (deduplicación)
 # ---------------------------------------------------------------------------
+
 
 class AseguradoBuscarOCrearBody(BaseModel):
     """
@@ -187,6 +189,7 @@ class AseguradoBuscarOCrearResponse(BaseModel):
 # Poliza_asegurado — vínculo
 # ---------------------------------------------------------------------------
 
+
 class PolizaAseguradoCreate(BaseModel):
     asegurado_id: UUID
     rol: RolAsegurado = RolAsegurado.titular
@@ -212,6 +215,7 @@ class PolizaAseguradoResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Poliza
 # ---------------------------------------------------------------------------
+
 
 class PolizaCreate(BaseModel):
     numero_poliza: str = Field(min_length=1, max_length=50)

@@ -50,13 +50,14 @@ class Settings(BaseSettings):
     @classmethod
     def validar_fernet_key(cls, v: str) -> str:
         from cryptography.fernet import Fernet
+
         try:
             # Verificar que la clave es válida intentando crear un Fernet con ella
             Fernet(v.encode())
         except Exception as exc:
             raise ValueError(
                 "ADMIN_ENCRYPTION_KEY no es una clave Fernet válida. "
-                "Generar con: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+                'Generar con: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
             ) from exc
         return v
 

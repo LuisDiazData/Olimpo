@@ -96,7 +96,7 @@ def create_app() -> FastAPI:
     # Routers
     # -------------------------------------------------------------------------
     app.include_router(health.router)
-    app.include_router(gmail_webhook.router)   # sin prefix: /webhook/gmail (URL fija para Pub/Sub)
+    app.include_router(gmail_webhook.router)  # sin prefix: /webhook/gmail (URL fija para Pub/Sub)
     app.include_router(usuarios.router, prefix="/api/v1")
     app.include_router(agentes.router, prefix="/api/v1")
     app.include_router(asignaciones.router, prefix="/api/v1")

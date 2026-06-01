@@ -15,12 +15,13 @@ se genera aquí y se devuelve UNA SOLA VEZ en la respuesta — el Superadmin la
 anota y la entrega al director. Si se pierde, usar reset-password.
 """
 
+from typing import Any, cast
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
-from supabase_auth.errors import AuthApiError
+from supabase import AuthApiError
 
 from core.auth import require_superadmin
 from core.crypto import descifrar_key
@@ -39,6 +40,7 @@ router = APIRouter(
 # MODELOS
 # =============================================================================
 
+
 class UsuarioMaestroCreate(BaseModel):
     nombre: str = Field(min_length=2, max_length=100, description="Nombre completo del director.")
     email: EmailStr
@@ -54,7 +56,7 @@ class UsuarioMaestroCreado(BaseModel):
     nombre: str
     password_temporal: str = Field(
         description="Contraseña en texto plano. Guardarla y entregarla al director. "
-                    "No se puede recuperar después — usar reset-password si se pierde."
+        "No se puede recuperar después — usar reset-password si se pierde."
     )
 
 
@@ -66,13 +68,20 @@ class ResetPasswordBody(BaseModel):
 # HELPER INTERNO
 # =============================================================================
 
-def _get_tenant_activo(tenant_id: UUID):
+
+def _get_tenant_activo(tenant_id: UUID) -> dict[str, Any]:
     """Obtiene el registro del tenant y verifica que esté activo. Lanza 404/403 si no."""
     db = get_admin_db()
-    result = db.table("tenant").select(
-        "id, nombre, subdominio, supabase_url, service_role_key_enc, "
-        "activo, usuario_maestro_id, usuario_maestro_email"
-    ).eq("id", str(tenant_id)).single().execute()
+    result = (
+        db.table("tenant")
+        .select(
+            "id, nombre, subdominio, supabase_url, service_role_key_enc, "
+            "activo, usuario_maestro_id, usuario_maestro_email"
+        )
+        .eq("id", str(tenant_id))
+        .single()
+        .execute()
+    )
 
     if not result.data:
         raise HTTPException(
@@ -80,7 +89,7 @@ def _get_tenant_activo(tenant_id: UUID):
             detail={"error_code": "TENANT_NO_ENCONTRADO", "mensaje": "Tenant no encontrado."},
         )
 
-    tenant = result.data
+    tenant = cast(dict[str, Any], result.data)
     if not tenant["activo"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -95,6 +104,7 @@ def _get_tenant_activo(tenant_id: UUID):
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
+
 
 @router.post(
     "/{tenant_id}/usuario-maestro",
@@ -117,8 +127,8 @@ def crear_usuario_maestro(tenant_id: UUID, body: UsuarioMaestroCreate):
             detail={
                 "error_code": "USUARIO_MAESTRO_EXISTENTE",
                 "mensaje": "Este tenant ya tiene un usuario maestro. "
-                           "Usar /reset-password para cambiar la contraseña o "
-                           "/bloquear para suspenderlo.",
+                "Usar /reset-password para cambiar la contraseña o "
+                "/bloquear para suspenderlo.",
             },
         )
 
@@ -126,13 +136,15 @@ def crear_usuario_maestro(tenant_id: UUID, body: UsuarioMaestroCreate):
     tenant_client = get_tenant_client(tenant["supabase_url"], service_role_key)
 
     try:
-        response = tenant_client.auth.admin.create_user({
-            "email": str(body.email),
-            "password": body.password,
-            "app_metadata": {"rol": "director_general"},
-            "user_metadata": {"nombre": body.nombre},
-            "email_confirm": True,
-        })
+        response = tenant_client.auth.admin.create_user(
+            {
+                "email": str(body.email),
+                "password": body.password,
+                "app_metadata": {"rol": "director_general"},
+                "user_metadata": {"nombre": body.nombre},
+                "email_confirm": True,
+            }
+        )
     except AuthApiError as exc:
         if "already registered" in str(exc).lower() or "email_exists" in str(exc).lower():
             raise HTTPException(
@@ -155,14 +167,19 @@ def crear_usuario_maestro(tenant_id: UUID, body: UsuarioMaestroCreate):
     if usuario is None:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={"error_code": "RESPUESTA_VACIA", "mensaje": "Supabase no devolvió el usuario creado."},
+            detail={
+                "error_code": "RESPUESTA_VACIA",
+                "mensaje": "Supabase no devolvió el usuario creado.",
+            },
         )
 
     # Actualizar el registro del tenant con los datos del usuario maestro recién creado
-    get_admin_db().table("tenant").update({
-        "usuario_maestro_id": str(usuario.id),
-        "usuario_maestro_email": str(body.email),
-    }).eq("id", str(tenant_id)).execute()
+    get_admin_db().table("tenant").update(
+        {
+            "usuario_maestro_id": str(usuario.id),
+            "usuario_maestro_email": str(body.email),
+        }
+    ).eq("id", str(tenant_id)).execute()
 
     log.info(
         "usuario_maestro_creado",

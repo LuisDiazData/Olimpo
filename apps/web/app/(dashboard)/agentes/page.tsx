@@ -53,8 +53,8 @@ export default function AgentesPage() {
     qc.invalidateQueries({ queryKey: ["agentes"] })
   }, [qc])
 
-  const activos = data ?? []
-  const inactivosList = inactivos ?? []
+  const activos = useMemo(() => data ?? [], [data])
+  const inactivosList = useMemo(() => inactivos ?? [], [inactivos])
   const todos = useMemo(
     () => [...activos, ...inactivosList],
     [activos, inactivosList]

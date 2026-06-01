@@ -37,6 +37,7 @@ _ESCRITURA = [
 # GET /asignaciones
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/asignaciones",
     response_model=list[AsignacionResponse],
@@ -51,7 +52,9 @@ async def listar_asignaciones(
     ramo: RamoUsuario | None = Query(default=None, description="Filtrar por ramo."),
     agente_id: UUID | None = Query(default=None, description="UUID del agente de seguros."),
     analista_id: UUID | None = Query(default=None, description="UUID del analista asignado."),
-    activo: bool | None = Query(default=True, description="False para incluir reglas desactivadas."),
+    activo: bool | None = Query(
+        default=True, description="False para incluir reglas desactivadas."
+    ),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     usuario: UsuarioToken = Depends(get_current_user),
@@ -81,6 +84,7 @@ async def listar_asignaciones(
 # GET /asignaciones/resolver  (ANTES que /{id} para que FastAPI no lo confunda)
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/asignaciones/resolver",
     response_model=ResolverAsignacionResponse,
@@ -95,12 +99,19 @@ async def listar_asignaciones(
     ),
 )
 async def resolver_asignacion(
-    agente_id: UUID = Query(..., description="UUID del agente de seguros del que proviene el correo."),
-    ramo: RamoUsuario = Query(..., description="Ramo del trÃ¡mite a asignar (vida, autos, gmm, etc.)."),
-    fecha: date = Query(default_factory=date.today, description="Fecha para la que resolver. Por defecto: hoy."),
+    agente_id: UUID = Query(
+        ..., description="UUID del agente de seguros del que proviene el correo."
+    ),
+    ramo: RamoUsuario = Query(
+        ..., description="Ramo del trÃ¡mite a asignar (vida, autos, gmm, etc.)."
+    ),
+    fecha: date = Query(
+        default_factory=date.today, description="Fecha para la que resolver. Por defecto: hoy."
+    ),
     actor: UsuarioToken = Depends(get_current_user_or_agent),
 ) -> ResolverAsignacionResponse:
     from core.database import get_admin_db
+
     db = get_admin_db()
 
     result = db.rpc(
@@ -122,6 +133,7 @@ async def resolver_asignacion(
 # ---------------------------------------------------------------------------
 # POST /asignaciones
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/asignaciones",
@@ -153,7 +165,9 @@ async def crear_asignacion(
         result = (
             db.table("asignacion")
             .insert(payload)
-            .select("id, agente_id, ramo, analista_id, notas, asignado_por, activo, created_at, updated_at")
+            .select(
+                "id, agente_id, ramo, analista_id, notas, asignado_por, activo, created_at, updated_at"
+            )
             .execute()
         )
         if result.data:
@@ -183,6 +197,7 @@ async def crear_asignacion(
 # DELETE /asignaciones/{id}
 # ---------------------------------------------------------------------------
 
+
 @router.delete(
     "/asignaciones/{asignacion_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -199,16 +214,14 @@ async def desactivar_asignacion(
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> None:
     db = get_user_db(usuario.access_token)
-    result = (
-        db.table("asignacion")
-        .update({"activo": False})
-        .eq("id", str(asignacion_id))
-        .execute()
-    )
+    result = db.table("asignacion").update({"activo": False}).eq("id", str(asignacion_id)).execute()
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "ASIGNACION_NO_ENCONTRADA", "mensaje": "AsignaciÃ³n no encontrada."},
+            detail={
+                "error_code": "ASIGNACION_NO_ENCONTRADA",
+                "mensaje": "AsignaciÃ³n no encontrada.",
+            },
         )
     log.info("asignacion_desactivada", id=str(asignacion_id), por=str(usuario.id))
 
@@ -216,6 +229,7 @@ async def desactivar_asignacion(
 # ---------------------------------------------------------------------------
 # PATCH /asignaciones/{id}
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/asignaciones/{asignacion_id}",
@@ -230,6 +244,7 @@ async def actualizar_asignacion(
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> AsignacionResponse:
     from core.database import get_admin_db
+
     db_admin = get_admin_db()
 
     cambios = body.model_dump(exclude_none=True)
@@ -239,18 +254,31 @@ async def actualizar_asignacion(
             detail="No se enviaron campos para actualizar.",
         )
 
-    result = db_admin.table("asignacion").select(
-        "id, agente_id, ramo, analista_id, notas, asignado_por, activo, created_at, updated_at"
-    ).eq("id", str(asignacion_id)).maybe_single().execute()
+    result = (
+        db_admin.table("asignacion")
+        .select(
+            "id, agente_id, ramo, analista_id, notas, asignado_por, activo, created_at, updated_at"
+        )
+        .eq("id", str(asignacion_id))
+        .maybe_single()
+        .execute()
+    )
 
     if not result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asignación no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Asignación no encontrada."
+        )
 
     db_admin.table("asignacion").update(cambios).eq("id", str(asignacion_id)).execute()
 
-    refreshed = db_admin.table("asignacion").select(
-        "id, agente_id, ramo, analista_id, notas, asignado_por, activo, created_at, updated_at"
-    ).eq("id", str(asignacion_id)).execute()
+    refreshed = (
+        db_admin.table("asignacion")
+        .select(
+            "id, agente_id, ramo, analista_id, notas, asignado_por, activo, created_at, updated_at"
+        )
+        .eq("id", str(asignacion_id))
+        .execute()
+    )
 
     log.info("asignacion_actualizada", id=str(asignacion_id), cambios=cambios, por=str(usuario.id))
     return AsignacionResponse.model_validate(refreshed.data[0])
@@ -259,6 +287,7 @@ async def actualizar_asignacion(
 # ---------------------------------------------------------------------------
 # POST /asignaciones/bulk
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/asignaciones/bulk",
@@ -278,13 +307,19 @@ async def asignacion_masiva(
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> BulkAsignacionResult:
     from core.database import get_admin_db
+
     db_admin = get_admin_db()
 
     agente_ids = [str(aid) for aid in body.agente_ids]
 
-    existing_q = db_admin.table("asignacion").select(
-        "agente_id, ramo"
-    ).in_("agente_id", agente_ids).eq("ramo", body.ramo.value).eq("activo", True).execute()
+    existing_q = (
+        db_admin.table("asignacion")
+        .select("agente_id, ramo")
+        .in_("agente_id", agente_ids)
+        .eq("ramo", body.ramo.value)
+        .eq("activo", True)
+        .execute()
+    )
 
     existing_keys: set[tuple[str, str]] = {
         (r["agente_id"], r["ramo"]) for r in (existing_q.data or [])
@@ -299,23 +334,33 @@ async def asignacion_masiva(
         key = (agente_id, body.ramo.value)
         if key in existing_keys:
             saltados += 1
-            detalle.append(f"Saltado agente {agente_id}: ya tiene asignación activa para {body.ramo.value}.")
+            detalle.append(
+                f"Saltado agente {agente_id}: ya tiene asignación activa para {body.ramo.value}."
+            )
             continue
 
         try:
-            db_admin.table("asignacion").insert({
-                "agente_id":     agente_id,
-                "ramo":          body.ramo.value,
-                "analista_id":   str(body.analista_id),
-                "asignado_por":  str(usuario.id),
-                "notas":         body.notas,
-            }).execute()
+            db_admin.table("asignacion").insert(
+                {
+                    "agente_id": agente_id,
+                    "ramo": body.ramo.value,
+                    "analista_id": str(body.analista_id),
+                    "asignado_por": str(usuario.id),
+                    "notas": body.notas,
+                }
+            ).execute()
             creados += 1
         except Exception as exc:
             errores += 1
             detalle.append(f"Error agente {agente_id}: {exc}")
 
-    log.info("asignacion_masiva", creados=creados, saltados=saltados, errores=errores, por=str(usuario.id))
+    log.info(
+        "asignacion_masiva",
+        creados=creados,
+        saltados=saltados,
+        errores=errores,
+        por=str(usuario.id),
+    )
 
     return BulkAsignacionResult(
         total=len(body.agente_ids),

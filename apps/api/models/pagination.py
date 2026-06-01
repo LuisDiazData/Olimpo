@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 T = TypeVar("T")
 
 
-class PaginatedResponse[T](BaseModel):
+class PaginatedResponse(BaseModel, Generic[T]):  # noqa: UP046
     """
     Envuelve cualquier lista con metadatos de paginación.
     Necesario para que agentes MCP sepan si existen más registros.

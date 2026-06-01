@@ -38,9 +38,11 @@ router = APIRouter(tags=["gmail-webhook"])
 # MODELOS
 # ===========================================================================
 
+
 class PubSubMessage(BaseModel):
     """Mensaje de Google Cloud Pub/Sub."""
-    data: str           # Base64-encoded JSON con historyId y emailAddress
+
+    data: str  # Base64-encoded JSON con historyId y emailAddress
     messageId: str
     publishTime: str
     attributes: dict[str, str] = {}
@@ -48,19 +50,22 @@ class PubSubMessage(BaseModel):
 
 class PubSubNotification(BaseModel):
     """Payload completo de una notificación Pub/Sub."""
+
     message: PubSubMessage
     subscription: str
 
 
 class GmailHistoryNotification(BaseModel):
     """Datos decodificados del campo data del mensaje Pub/Sub."""
+
     historyId: int
-    emailAddress: str   # La cuenta de Workspace que recibió el correo
+    emailAddress: str  # La cuenta de Workspace que recibió el correo
 
 
 # ===========================================================================
 # HELPERS
 # ===========================================================================
+
 
 def _decodificar_pubsub_data(data_b64: str) -> dict[str, Any]:
     """Decodifica el campo data de Pub/Sub (base64 → JSON)."""
@@ -102,6 +107,7 @@ async def _encolar_procesamiento_correo(
         # Importar la tarea de Celery aquí para evitar import circular
         # La tarea vive en packages/agents/agente_1_ingesta.py
         from celery_app import celery_app  # type: ignore[import]
+
         celery_app.send_task(
             "agentes.agente_1.procesar_notificacion_gmail",
             kwargs={
@@ -131,6 +137,7 @@ async def _encolar_procesamiento_correo(
 # ===========================================================================
 # ENDPOINTS
 # ===========================================================================
+
 
 @router.post(
     "/webhook/gmail",
@@ -224,10 +231,15 @@ async def estado_gmail_webhook(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token inválido.")
 
     db = get_admin_db()
-    result = db.table("gmail_sync_state").select(
-        "cuenta_workspace, ultimo_history_id, ultimo_sync_at, "
-        "correos_ultimo_sync, canal_activo, canal_expira_at, updated_at"
-    ).order("cuenta_workspace").execute()
+    result = (
+        db.table("gmail_sync_state")
+        .select(
+            "cuenta_workspace, ultimo_history_id, ultimo_sync_at, "
+            "correos_ultimo_sync, canal_activo, canal_expira_at, updated_at"
+        )
+        .order("cuenta_workspace")
+        .execute()
+    )
 
     cuentas = result.data or []
     return {
@@ -257,6 +269,7 @@ async def renovar_canal_gmail(
 
     try:
         from celery_app import celery_app  # type: ignore[import]
+
         celery_app.send_task(
             "agentes.gmail_worker.renovar_canal_pubsub",
             kwargs={"email_address": email_address},

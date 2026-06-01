@@ -62,7 +62,9 @@ _ESCRITURA = [
 
 
 def _check_agente_existe(db: Client, agente_id: UUID) -> dict:
-    result = db.table("agente").select("id, activo").eq("id", str(agente_id)).maybe_single().execute()
+    result = (
+        db.table("agente").select("id, activo").eq("id", str(agente_id)).maybe_single().execute()
+    )
     if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agente no encontrado.")
     return result.data
@@ -71,6 +73,7 @@ def _check_agente_existe(db: Client, agente_id: UUID) -> dict:
 # ---------------------------------------------------------------------------
 # GET /agentes
 # ---------------------------------------------------------------------------
+
 
 @router.get("", response_model=list[AgenteListItem])
 def listar_agentes(
@@ -103,11 +106,13 @@ def listar_agentes(
         email_pref = next((e["email"] for e in emails if e.get("preferente")), None)
         tel_pref = next((t["numero"] for t in telefonos if t.get("preferente")), None)
 
-        items.append(AgenteListItem(
-            **row,
-            email_preferente=email_pref,
-            telefono_preferente=tel_pref,
-        ))
+        items.append(
+            AgenteListItem(
+                **row,
+                email_preferente=email_pref,
+                telefono_preferente=tel_pref,
+            )
+        )
 
     return items
 
@@ -116,7 +121,10 @@ def listar_agentes(
 # POST /agentes
 # ---------------------------------------------------------------------------
 
-@router.post("", response_model=AgenteResponse, status_code=status.HTTP_201_CREATED, dependencies=_ESCRITURA)
+
+@router.post(
+    "", response_model=AgenteResponse, status_code=status.HTTP_201_CREATED, dependencies=_ESCRITURA
+)
 def crear_agente(
     body: AgenteCreate,
     db: Client = Depends(get_db),
@@ -125,7 +133,9 @@ def crear_agente(
         result = (
             db.table("agente")
             .insert(body.model_dump(mode="json", exclude_none=True))
-            .select("id, cua, nombre, nombre_comercial, rfc, fecha_afiliacion, notas, activo, created_at, updated_at")
+            .select(
+                "id, cua, nombre, nombre_comercial, rfc, fecha_afiliacion, notas, activo, created_at, updated_at"
+            )
             .execute()
         )
         if result.data:
@@ -152,6 +162,7 @@ def crear_agente(
 # ---------------------------------------------------------------------------
 # GET /agentes/template — descarga plana Excel con columnas requeridas
 # ---------------------------------------------------------------------------
+
 
 @router.get("/template", dependencies=[Depends(get_current_user)])
 def descargar_template():
@@ -190,8 +201,28 @@ def descargar_template():
         cell.border = thin_border
 
     example_rows = [
-        ["A000123456", "Juan Pérez García", "Agencia JP", "PEGJ800101ABC", "2020-01-15", "juan@email.com", "55 1234 5678", "celular", "Agente con 5 años de experiencia"],
-        ["A000234567", "María López Hernández", "Seguros ML", "LOPM850202XYZ", "2019-06-01", "maria@email.com", "55 8765 4321", "whatsapp", ""],
+        [
+            "A000123456",
+            "Juan Pérez García",
+            "Agencia JP",
+            "PEGJ800101ABC",
+            "2020-01-15",
+            "juan@email.com",
+            "55 1234 5678",
+            "celular",
+            "Agente con 5 años de experiencia",
+        ],
+        [
+            "A000234567",
+            "María López Hernández",
+            "Seguros ML",
+            "LOPM850202XYZ",
+            "2019-06-01",
+            "maria@email.com",
+            "55 8765 4321",
+            "whatsapp",
+            "",
+        ],
     ]
 
     example_fill = PatternFill("solid", fgColor="F8FAFC")
@@ -227,6 +258,7 @@ def descargar_template():
 # GET /agentes/{id}
 # ---------------------------------------------------------------------------
 
+
 @router.get("/{agente_id}", response_model=AgenteResponse)
 def obtener_agente(
     agente_id: UUID,
@@ -261,6 +293,7 @@ def obtener_agente(
 # PATCH /agentes/{id}
 # ---------------------------------------------------------------------------
 
+
 @router.patch("/{agente_id}", response_model=AgenteResponse, dependencies=_ESCRITURA)
 def actualizar_agente(
     agente_id: UUID,
@@ -280,7 +313,9 @@ def actualizar_agente(
         db.table("agente").update(cambios).eq("id", str(agente_id)).execute()
     except Exception as exc:
         if "uq_agente_rfc" in str(exc):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="RFC ya registrado en otro agente.") from exc
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="RFC ya registrado en otro agente."
+            ) from exc
         raise exc from None
 
     return obtener_agente(agente_id, db)
@@ -289,6 +324,7 @@ def actualizar_agente(
 # ---------------------------------------------------------------------------
 # DELETE /agentes/{id} â€” soft-delete
 # ---------------------------------------------------------------------------
+
 
 @router.delete("/{agente_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_ESCRITURA)
 def desactivar_agente(
@@ -305,7 +341,13 @@ def desactivar_agente(
 # TelÃ©fonos
 # ---------------------------------------------------------------------------
 
-@router.post("/{agente_id}/telefonos", response_model=TelefonoResponse, status_code=status.HTTP_201_CREATED, dependencies=_ESCRITURA)
+
+@router.post(
+    "/{agente_id}/telefonos",
+    response_model=TelefonoResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=_ESCRITURA,
+)
 def agregar_telefono(
     agente_id: UUID,
     body: TelefonoCreate,
@@ -322,7 +364,11 @@ def agregar_telefono(
     return TelefonoResponse.model_validate(result.data)
 
 
-@router.patch("/{agente_id}/telefonos/{telefono_id}/preferente", response_model=TelefonoResponse, dependencies=_ESCRITURA)
+@router.patch(
+    "/{agente_id}/telefonos/{telefono_id}/preferente",
+    response_model=TelefonoResponse,
+    dependencies=_ESCRITURA,
+)
 def marcar_telefono_preferente(
     agente_id: UUID,
     telefono_id: UUID,
@@ -334,7 +380,9 @@ def marcar_telefono_preferente(
     Se hace en dos pasos para evitar conflicto de constraint.
     """
     # Quitar preferente actual
-    db.table("agente_telefono").update({"preferente": False}).eq("agente_id", str(agente_id)).eq("preferente", True).execute()
+    db.table("agente_telefono").update({"preferente": False}).eq("agente_id", str(agente_id)).eq(
+        "preferente", True
+    ).execute()
 
     # Marcar el nuevo
     result = (
@@ -349,24 +397,38 @@ def marcar_telefono_preferente(
         result.data = result.data[0]
 
     if not result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="TelÃ©fono no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="TelÃ©fono no encontrado."
+        )
     return TelefonoResponse.model_validate(result.data)
 
 
-@router.delete("/{agente_id}/telefonos/{telefono_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_ESCRITURA)
+@router.delete(
+    "/{agente_id}/telefonos/{telefono_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=_ESCRITURA,
+)
 def eliminar_telefono(
     agente_id: UUID,
     telefono_id: UUID,
     db: Client = Depends(get_db),
 ) -> None:
-    db.table("agente_telefono").delete().eq("id", str(telefono_id)).eq("agente_id", str(agente_id)).execute()
+    db.table("agente_telefono").delete().eq("id", str(telefono_id)).eq(
+        "agente_id", str(agente_id)
+    ).execute()
 
 
 # ---------------------------------------------------------------------------
 # Emails del agente
 # ---------------------------------------------------------------------------
 
-@router.post("/{agente_id}/emails", response_model=AgenteEmailResponse, status_code=status.HTTP_201_CREATED, dependencies=_ESCRITURA)
+
+@router.post(
+    "/{agente_id}/emails",
+    response_model=AgenteEmailResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=_ESCRITURA,
+)
 def agregar_email(
     agente_id: UUID,
     body: AgenteEmailCreate,
@@ -384,7 +446,10 @@ def agregar_email(
     except Exception as exc:
         msg = str(exc)
         if "uq_agente_email_email" in msg or "duplicate" in msg.lower():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"El correo '{body.email}' ya estÃ¡ registrado.") from exc
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"El correo '{body.email}' ya estÃ¡ registrado.",
+            ) from exc
         if "ya estÃ¡ registrado como email de un asistente" in msg:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         raise exc from None
@@ -392,13 +457,19 @@ def agregar_email(
     return AgenteEmailResponse.model_validate(result.data)
 
 
-@router.patch("/{agente_id}/emails/{email_id}/preferente", response_model=AgenteEmailResponse, dependencies=_ESCRITURA)
+@router.patch(
+    "/{agente_id}/emails/{email_id}/preferente",
+    response_model=AgenteEmailResponse,
+    dependencies=_ESCRITURA,
+)
 def marcar_email_preferente(
     agente_id: UUID,
     email_id: UUID,
     db: Client = Depends(get_db),
 ) -> AgenteEmailResponse:
-    db.table("agente_email").update({"preferente": False}).eq("agente_id", str(agente_id)).eq("preferente", True).execute()
+    db.table("agente_email").update({"preferente": False}).eq("agente_id", str(agente_id)).eq(
+        "preferente", True
+    ).execute()
 
     result = (
         db.table("agente_email")
@@ -416,20 +487,32 @@ def marcar_email_preferente(
     return AgenteEmailResponse.model_validate(result.data)
 
 
-@router.delete("/{agente_id}/emails/{email_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_ESCRITURA)
+@router.delete(
+    "/{agente_id}/emails/{email_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=_ESCRITURA,
+)
 def eliminar_email(
     agente_id: UUID,
     email_id: UUID,
     db: Client = Depends(get_db),
 ) -> None:
-    db.table("agente_email").delete().eq("id", str(email_id)).eq("agente_id", str(agente_id)).execute()
+    db.table("agente_email").delete().eq("id", str(email_id)).eq(
+        "agente_id", str(agente_id)
+    ).execute()
 
 
 # ---------------------------------------------------------------------------
 # Asistentes
 # ---------------------------------------------------------------------------
 
-@router.post("/{agente_id}/asistentes", response_model=AsistenteResponse, status_code=status.HTTP_201_CREATED, dependencies=_ESCRITURA)
+
+@router.post(
+    "/{agente_id}/asistentes",
+    response_model=AsistenteResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=_ESCRITURA,
+)
 def agregar_asistente(
     agente_id: UUID,
     body: AsistenteCreate,
@@ -447,7 +530,10 @@ def agregar_asistente(
     except Exception as exc:
         msg = str(exc)
         if "uq_asistente_email" in msg or "duplicate" in msg.lower():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"El correo '{body.email}' ya estÃ¡ registrado como asistente.") from exc
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"El correo '{body.email}' ya estÃ¡ registrado como asistente.",
+            ) from exc
         if "ya estÃ¡ registrado como email de un agente" in msg:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         raise exc from None
@@ -455,7 +541,11 @@ def agregar_asistente(
     return AsistenteResponse.model_validate(result.data)
 
 
-@router.patch("/{agente_id}/asistentes/{asistente_id}", response_model=AsistenteResponse, dependencies=_ESCRITURA)
+@router.patch(
+    "/{agente_id}/asistentes/{asistente_id}",
+    response_model=AsistenteResponse,
+    dependencies=_ESCRITURA,
+)
 def actualizar_asistente(
     agente_id: UUID,
     asistente_id: UUID,
@@ -464,7 +554,9 @@ def actualizar_asistente(
 ) -> AsistenteResponse:
     cambios = body.model_dump(exclude_none=True)
     if not cambios:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se enviaron campos.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se enviaron campos."
+        )
 
     result = (
         db.table("asistente")
@@ -478,24 +570,38 @@ def actualizar_asistente(
         result.data = result.data[0]
 
     if not result.data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asistente no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Asistente no encontrado."
+        )
     return AsistenteResponse.model_validate(result.data)
 
 
-@router.delete("/{agente_id}/asistentes/{asistente_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_ESCRITURA)
+@router.delete(
+    "/{agente_id}/asistentes/{asistente_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=_ESCRITURA,
+)
 def eliminar_asistente(
     agente_id: UUID,
     asistente_id: UUID,
     db: Client = Depends(get_db),
 ) -> None:
-    db.table("asistente").delete().eq("id", str(asistente_id)).eq("agente_id", str(agente_id)).execute()
+    db.table("asistente").delete().eq("id", str(asistente_id)).eq(
+        "agente_id", str(agente_id)
+    ).execute()
 
 
 # ---------------------------------------------------------------------------
 # POST /agentes/import
 # ---------------------------------------------------------------------------
 
-@router.post("/import", response_model=ImportResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(get_current_user)] + _ESCRITURA)
+
+@router.post(
+    "/import",
+    response_model=ImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)] + _ESCRITURA,
+)
 async def importar_agentes(
     file: UploadFile = File(...),
     db: Client = Depends(get_db),
@@ -517,13 +623,19 @@ async def importar_agentes(
     try:
         wb = load_workbook(BytesIO(contents), data_only=True)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se pudo leer el archivo Excel.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No se pudo leer el archivo Excel.",
+        ) from exc
 
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
 
     if len(rows) < 2:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="El archivo no contiene filas de datos.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El archivo no contiene filas de datos.",
+        )
 
     header_row = [str(c).strip() if c is not None else "" for c in rows[0]]
     col_map = {h.lower(): i for i, h in enumerate(header_row)}
@@ -540,6 +652,7 @@ async def importar_agentes(
     preview_errors: list[tuple[int, str]] = []
 
     for idx, row in enumerate(rows[1:], start=2):
+
         def _col(key: str, default=None):
             return row[col_map[key]] if key in col_map and col_map[key] < len(row) else default
 
@@ -551,7 +664,10 @@ async def importar_agentes(
             fecha_afiliacion=str(_col("fecha de afiliación (yyyy-mm-dd)") or "").strip() or None,
             email=str(_col("correo electrónico") or "").strip() or None,
             telefono=str(_col("teléfono") or "").strip() or None,
-            tipo_telefono=str(_col("tipo de teléfono (celular/oficina/casa/whatsapp/otro)") or "").strip() or None,
+            tipo_telefono=str(
+                _col("tipo de teléfono (celular/oficina/casa/whatsapp/otro)") or ""
+            ).strip()
+            or None,
             notas=str(_col("notas") or "").strip() or None,
         )
 
@@ -565,7 +681,9 @@ async def importar_agentes(
             try:
                 date.fromisoformat(raw.fecha_afiliacion)
             except ValueError:
-                row_errors.append(f"Fecha de afiliación inválida: '{raw.fecha_afiliacion}' — usar formato YYYY-MM-DD")
+                row_errors.append(
+                    f"Fecha de afiliación inválida: '{raw.fecha_afiliacion}' — usar formato YYYY-MM-DD"
+                )
                 raw.fecha_afiliacion = None
 
         if raw.tipo_telefono and raw.tipo_telefono not in {t.value for t in TipoTelefono}:
@@ -579,7 +697,8 @@ async def importar_agentes(
     if not import_rows:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="No se encontraron filas válidas para importar. " + "; ".join(f"Fila {r}: {e}" for r, e in preview_errors),
+            detail="No se encontraron filas válidas para importar. "
+            + "; ".join(f"Fila {r}: {e}" for r, e in preview_errors),
         )
 
     cuas = [r.cua for r in import_rows]
@@ -600,7 +719,7 @@ async def importar_agentes(
     existing: dict[str, dict] = {}
     if cuas:
         res = admin_db.table("agente").select("id, cua").in_("cua", cuas).execute()
-        for r in (res.data or []):
+        for r in res.data or []:
             existing[r["cua"]] = r
 
     results: list[ImportResultItem] = []
@@ -613,7 +732,11 @@ async def importar_agentes(
 
         if cua in existing:
             errores_duplicados += 1
-            results.append(ImportResultItem(row=idx, cua=cua, success=False, error="Ya existe un agente con este CUA"))
+            results.append(
+                ImportResultItem(
+                    row=idx, cua=cua, success=False, error="Ya existe un agente con este CUA"
+                )
+            )
             continue
 
         try:
@@ -636,20 +759,24 @@ async def importar_agentes(
 
             if row_data.email:
                 with contextlib.suppress(Exception):
-                    admin_db.table("agente_email").insert({
-                        "agente_id": agente_id,
-                        "email": row_data.email,
-                        "preferente": True,
-                    }).execute()
+                    admin_db.table("agente_email").insert(
+                        {
+                            "agente_id": agente_id,
+                            "email": row_data.email,
+                            "preferente": True,
+                        }
+                    ).execute()
 
             if row_data.telefono:
                 with contextlib.suppress(Exception):
-                    admin_db.table("agente_telefono").insert({
-                        "agente_id": agente_id,
-                        "numero": row_data.telefono,
-                        "tipo": row_data.tipo_telefono or TipoTelefono.celular.value,
-                        "preferente": True,
-                    }).execute()
+                    admin_db.table("agente_telefono").insert(
+                        {
+                            "agente_id": agente_id,
+                            "numero": row_data.telefono,
+                            "tipo": row_data.tipo_telefono or TipoTelefono.celular.value,
+                            "preferente": True,
+                        }
+                    ).execute()
 
             exitosos += 1
             results.append(ImportResultItem(row=idx, cua=cua, success=True, agente_id=agente_id))
@@ -668,7 +795,13 @@ async def importar_agentes(
         detalle_parts.append(f"{fallidos} fallido(s)")
     detalle = "; ".join(detalle_parts) or "Sin resultados"
 
-    log.info("agentes_importados", total=len(import_rows), exitosos=exitosos, fallidos=fallidos, errores_duplicados=errores_duplicados)
+    log.info(
+        "agentes_importados",
+        total=len(import_rows),
+        exitosos=exitosos,
+        fallidos=fallidos,
+        errores_duplicados=errores_duplicados,
+    )
 
     return ImportResponse(
         total=len(import_rows),
@@ -678,4 +811,3 @@ async def importar_agentes(
         results=results,
         detalle=detalle,
     )
-

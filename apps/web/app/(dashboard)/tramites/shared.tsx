@@ -10,7 +10,7 @@ export const ESTADO_BADGE: Record<string, { label: string; variant: Parameters<t
   turnado_a_gnp:              { label: "Turnado a GNP",         variant: "violet" },
   activado_gnp:               { label: "Activado por GNP",    variant: "orange" },
   complemento_en_revision:     { label: "Complemento en rev.",  variant: "sky" },
-  escalado:                   { label: "Escalado",              variant: "pink" },
+  escalado:                   { label: "Escalado",              variant: "rose" },
   completado:                 { label: "Completado",            variant: "green" },
   rechazado_gnp:              { label: "Rechazado por GNP",     variant: "red" },
   cancelado:                  { label: "Cancelado",             variant: "slate" },

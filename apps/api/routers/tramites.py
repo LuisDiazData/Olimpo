@@ -49,6 +49,7 @@ _GERENTES_Y_DIRECTORES = [
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_tramite_o_404(db, tramite_id: UUID) -> dict:
     result = (
         db.table("tramite")
@@ -60,7 +61,11 @@ def _get_tramite_o_404(db, tramite_id: UUID) -> dict:
     if not result.data:  # result es siempre truthy; data es None cuando no existe
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "TRAMITE_NO_ENCONTRADO", "mensaje": "Trámite no encontrado.", "tramite_id": str(tramite_id)},
+            detail={
+                "error_code": "TRAMITE_NO_ENCONTRADO",
+                "mensaje": "Trámite no encontrado.",
+                "tramite_id": str(tramite_id),
+            },
         )
     return result.data
 
@@ -92,7 +97,9 @@ def _enriquecer_tramite(data: dict) -> dict:
     # Agregar transiciones disponibles segÃºn estado actual
     try:
         estado_actual = EstadoTramite(data.get("estado", ""))
-        data["transiciones_disponibles"] = [e.value for e in TRANSICIONES_VALIDAS.get(estado_actual, [])]
+        data["transiciones_disponibles"] = [
+            e.value for e in TRANSICIONES_VALIDAS.get(estado_actual, [])
+        ]
     except ValueError:
         data["transiciones_disponibles"] = []
 
@@ -102,6 +109,7 @@ def _enriquecer_tramite(data: dict) -> dict:
 # ---------------------------------------------------------------------------
 # GET /tramites
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "",
@@ -115,15 +123,33 @@ def _enriquecer_tramite(data: dict) -> dict:
     ),
 )
 async def listar_tramites(
-    estado: EstadoTramite | None = Query(default=None, description="Filtrar por estado de la mÃ¡quina de estados."),
-    ramo: str | None = Query(default=None, description="Filtrar por ramo (vida, autos, gmm, danos, etc.)."),
-    analista_id: UUID | None = Query(default=None, description="UUID del analista asignado al trÃ¡mite."),
-    agente_id: UUID | None = Query(default=None, description="UUID del agente de seguros que originÃ³ el trÃ¡mite."),
-    requiere_atencion: bool | None = Query(default=None, description="True para ver solo trÃ¡mites con bandera de atenciÃ³n urgente."),
-    q: str | None = Query(default=None, description="BÃºsqueda de texto libre en folio y tÃ­tulo del trÃ¡mite."),
-    activo: bool = Query(default=True, description="False para incluir trÃ¡mites archivados/inactivos."),
-    limit: int = Query(default=50, ge=1, le=200, description="MÃ¡ximo de registros por pÃ¡gina (1-200)."),
-    offset: int = Query(default=0, ge=0, description="NÃºmero de registros a saltar para paginaciÃ³n."),
+    estado: EstadoTramite | None = Query(
+        default=None, description="Filtrar por estado de la mÃ¡quina de estados."
+    ),
+    ramo: str | None = Query(
+        default=None, description="Filtrar por ramo (vida, autos, gmm, danos, etc.)."
+    ),
+    analista_id: UUID | None = Query(
+        default=None, description="UUID del analista asignado al trÃ¡mite."
+    ),
+    agente_id: UUID | None = Query(
+        default=None, description="UUID del agente de seguros que originÃ³ el trÃ¡mite."
+    ),
+    requiere_atencion: bool | None = Query(
+        default=None, description="True para ver solo trÃ¡mites con bandera de atenciÃ³n urgente."
+    ),
+    q: str | None = Query(
+        default=None, description="BÃºsqueda de texto libre en folio y tÃ­tulo del trÃ¡mite."
+    ),
+    activo: bool = Query(
+        default=True, description="False para incluir trÃ¡mites archivados/inactivos."
+    ),
+    limit: int = Query(
+        default=50, ge=1, le=200, description="MÃ¡ximo de registros por pÃ¡gina (1-200)."
+    ),
+    offset: int = Query(
+        default=0, ge=0, description="NÃºmero de registros a saltar para paginaciÃ³n."
+    ),
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> PaginatedResponse[TramiteListItem]:
     db = get_user_db(usuario.access_token)
@@ -160,10 +186,7 @@ async def listar_tramites(
     # Obtener pÃ¡gina
     data_query = _apply_filters(db.table("tramite").select(base_select))
     result = (
-        data_query
-        .order("ultima_actividad", desc=True)
-        .range(offset, offset + limit - 1)
-        .execute()
+        data_query.order("ultima_actividad", desc=True).range(offset, offset + limit - 1).execute()
     )
 
     items = [TramiteListItem.model_validate(_enriquecer_tramite(row)) for row in result.data]
@@ -173,6 +196,7 @@ async def listar_tramites(
 # ---------------------------------------------------------------------------
 # POST /tramites
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "",
@@ -224,6 +248,7 @@ async def crear_tramite(
 # GET /tramites/{id}
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/{tramite_id}",
     response_model=TramiteResponse,
@@ -256,7 +281,11 @@ async def obtener_tramite(
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "TRAMITE_NO_ENCONTRADO", "mensaje": "Trámite no encontrado.", "tramite_id": str(tramite_id)},
+            detail={
+                "error_code": "TRAMITE_NO_ENCONTRADO",
+                "mensaje": "Trámite no encontrado.",
+                "tramite_id": str(tramite_id),
+            },
         )
 
     data = _enriquecer_tramite(result.data)
@@ -267,12 +296,12 @@ async def obtener_tramite(
         db.table("correo_tramite")
         .select("es_origen, correo!inner(de_email, de_nombre)")
         .eq("tramite_id", str(tramite_id))
-        .order("es_origen", desc=True)   # es_origen=true primero
+        .order("es_origen", desc=True)  # es_origen=true primero
         .limit(1)
         .execute()
     )
     if correo_origen.data:
-        c = (correo_origen.data[0].get("correo") or {})
+        c = correo_origen.data[0].get("correo") or {}
         data["correo_origen_email"] = c.get("de_email")
         data["correo_origen_nombre"] = c.get("de_nombre")
     else:
@@ -285,6 +314,7 @@ async def obtener_tramite(
 # ---------------------------------------------------------------------------
 # PATCH /tramites/{id}
 # ---------------------------------------------------------------------------
+
 
 @router.patch(
     "/{tramite_id}",
@@ -305,7 +335,10 @@ async def actualizar_tramite(
     if not cambios:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"error_code": "SIN_CAMBIOS", "mensaje": "No se enviaron campos para actualizar."},
+            detail={
+                "error_code": "SIN_CAMBIOS",
+                "mensaje": "No se enviaron campos para actualizar.",
+            },
         )
 
     db = get_user_db(usuario.access_token)
@@ -322,6 +355,7 @@ async def actualizar_tramite(
 # ---------------------------------------------------------------------------
 # POST /tramites/{id}/cambiar-estado
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/{tramite_id}/cambiar-estado",
@@ -385,10 +419,12 @@ async def cambiar_estado(
 
     if body.estado_nuevo == EstadoTramite.turnado_a_gnp:
         from datetime import date
+
         actualizaciones["ot_fecha_envio"] = date.today().isoformat()
 
     if body.estado_nuevo in (EstadoTramite.completado, EstadoTramite.rechazado_gnp):
         from datetime import date
+
         actualizaciones["ot_fecha_respuesta"] = date.today().isoformat()
 
     db.table("tramite").update(actualizaciones).eq("id", str(tramite_id)).execute()
@@ -396,10 +432,17 @@ async def cambiar_estado(
     # Control de SLAs: pausar cuando está en GNP, reanudar al retornar
     if body.estado_nuevo == EstadoTramite.turnado_a_gnp:
         db.rpc("pausar_sla_tramite", {"p_tramite_id": str(tramite_id)}).execute()
-    elif estado_actual == EstadoTramite.turnado_a_gnp and body.estado_nuevo != EstadoTramite.turnado_a_gnp:
+    elif (
+        estado_actual == EstadoTramite.turnado_a_gnp
+        and body.estado_nuevo != EstadoTramite.turnado_a_gnp
+    ):
         db.rpc("reanudar_sla_tramite", {"p_tramite_id": str(tramite_id)}).execute()
 
-    if body.estado_nuevo in (EstadoTramite.completado, EstadoTramite.rechazado_gnp, EstadoTramite.cancelado):
+    if body.estado_nuevo in (
+        EstadoTramite.completado,
+        EstadoTramite.rechazado_gnp,
+        EstadoTramite.cancelado,
+    ):
         db.rpc("cerrar_sla_tramite", {"p_tramite_id": str(tramite_id)}).execute()
 
     log.info(
@@ -415,6 +458,7 @@ async def cambiar_estado(
 # ---------------------------------------------------------------------------
 # POST /tramites/{id}/asignar
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/{tramite_id}/asignar",
@@ -443,7 +487,10 @@ async def asignar_analista(
         if not usuario.ramo:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail={"error_code": "GERENTE_SIN_RAMO", "mensaje": "Tu cuenta no tiene ramo asignado. Contacta al administrador."},
+                detail={
+                    "error_code": "GERENTE_SIN_RAMO",
+                    "mensaje": "Tu cuenta no tiene ramo asignado. Contacta al administrador.",
+                },
             )
         analista = (
             db.table("usuario")
@@ -455,7 +502,10 @@ async def asignar_analista(
         if not analista.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"error_code": "ANALISTA_NO_ENCONTRADO", "analista_id": str(body.analista_id)},
+                detail={
+                    "error_code": "ANALISTA_NO_ENCONTRADO",
+                    "analista_id": str(body.analista_id),
+                },
             )
         # Comparación directa sin ternario ambiguo
         if analista.data.get("ramo") != usuario.ramo.value:
@@ -480,7 +530,10 @@ async def asignar_analista(
     ).execute()
 
     if not resultado.data:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Sin respuesta de la función de reasignación.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Sin respuesta de la función de reasignación.",
+        )
 
     res = resultado.data[0] if isinstance(resultado.data, list) else resultado.data
 
@@ -518,6 +571,7 @@ async def asignar_analista(
 # POST /tramites/reasignar-masiva
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/reasignar-masiva",
     dependencies=_GERENTES_Y_DIRECTORES + [Depends(require_permiso("tramites.reasignar"))],
@@ -536,14 +590,20 @@ async def reasignar_tramites_masiva(
     if body.analista_origen_id == body.analista_destino_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error_code": "MISMO_ANALISTA", "mensaje": "El analista origen y destino no pueden ser el mismo."},
+            detail={
+                "error_code": "MISMO_ANALISTA",
+                "mensaje": "El analista origen y destino no pueden ser el mismo.",
+            },
         )
 
     admin = get_admin_db()
 
     # Gerentes: validar que ambos analistas sean de su ramo
     if usuario.rol == RolUsuario.gerente:
-        for campo, uuid in [("origen", body.analista_origen_id), ("destino", body.analista_destino_id)]:
+        for campo, uuid in [
+            ("origen", body.analista_origen_id),
+            ("destino", body.analista_destino_id),
+        ]:
             analista = (
                 admin.table("usuario")
                 .select("ramo, rol, activo, nombre")
@@ -554,7 +614,11 @@ async def reasignar_tramites_masiva(
             if not analista.data:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail={"error_code": "ANALISTA_NO_ENCONTRADO", "campo": campo, "analista_id": str(uuid)},
+                    detail={
+                        "error_code": "ANALISTA_NO_ENCONTRADO",
+                        "campo": campo,
+                        "analista_id": str(uuid),
+                    },
                 )
             if analista.data.get("ramo") != (usuario.ramo.value if usuario.ramo else None):
                 raise HTTPException(
@@ -579,7 +643,10 @@ async def reasignar_tramites_masiva(
     ).execute()
 
     if not resultado.data:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Sin respuesta de la función de reasignación masiva.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Sin respuesta de la función de reasignación masiva.",
+        )
     res = resultado.data[0] if isinstance(resultado.data, list) else resultado.data
     if not res.get("ok"):
         error_code = res.get("error_code", "ERROR_DESCONOCIDO")
@@ -611,6 +678,7 @@ async def reasignar_tramites_masiva(
 # GET /tramites/{id}/eventos
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/{tramite_id}/eventos",
     response_model=list[EventoResponse],
@@ -623,29 +691,31 @@ async def reasignar_tramites_masiva(
 )
 async def listar_eventos(
     tramite_id: UUID,
-    solo_visibles: bool = Query(default=True, description="True: solo eventos visibles en el timeline de la UI. False: incluye eventos internos del pipeline IA."),
+    solo_visibles: bool = Query(
+        default=True,
+        description="True: solo eventos visibles en el timeline de la UI. False: incluye eventos internos del pipeline IA.",
+    ),
     limit: int = Query(default=100, ge=1, le=500, description="MÃ¡ximo de eventos a devolver."),
     offset: int = Query(default=0, ge=0, description="NÃºmero de eventos a saltar."),
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> list[EventoResponse]:
     db = get_user_db(usuario.access_token)
 
-    query = db.table("tramite_evento").select(
-        "id, tramite_id, tipo_evento, estado_anterior, estado_nuevo, "
-        "usuario_id, agente_ia_nombre, descripcion, datos, "
-        "visible_en_timeline, created_at, "
-        "usuario!tramite_evento_usuario_id_fkey!left(nombre)"
-    ).eq("tramite_id", str(tramite_id))
+    query = (
+        db.table("tramite_evento")
+        .select(
+            "id, tramite_id, tipo_evento, estado_anterior, estado_nuevo, "
+            "usuario_id, agente_ia_nombre, descripcion, datos, "
+            "visible_en_timeline, created_at, "
+            "usuario!tramite_evento_usuario_id_fkey!left(nombre)"
+        )
+        .eq("tramite_id", str(tramite_id))
+    )
 
     if solo_visibles:
         query = query.eq("visible_en_timeline", True)
 
-    result = (
-        query
-        .order("created_at", desc=False)
-        .range(offset, offset + limit - 1)
-        .execute()
-    )
+    result = query.order("created_at", desc=False).range(offset, offset + limit - 1).execute()
 
     eventos = []
     for row in result.data:
@@ -659,6 +729,7 @@ async def listar_eventos(
 # ---------------------------------------------------------------------------
 # POST /tramites/{id}/eventos
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/{tramite_id}/eventos",
@@ -722,6 +793,7 @@ async def agregar_nota(
 # GET /tramites/{id}/documentos
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/{tramite_id}/documentos",
     response_model=list[DocumentoListItem],
@@ -765,6 +837,7 @@ async def listar_documentos_tramite(
 # ---------------------------------------------------------------------------
 # GET /tramites/{id}/correos
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/{tramite_id}/correos",
@@ -812,6 +885,7 @@ async def listar_correos_tramite(
 # GET /tramites/{id}/contactos
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/{tramite_id}/contactos",
     response_model=list[ContactoTramiteResponse],
@@ -850,33 +924,39 @@ async def listar_contactos_tramite(
     contactos: list[ContactoTramiteResponse] = []
 
     if agente := (t.get("agente") or {}):
-        contactos.append(ContactoTramiteResponse(
-            id=str(agente["id"]),
-            nombre=agente.get("nombre", "—"),
-            email=None,
-            telefono=None,
-            rol="agente",
-            cua=agente.get("cua"),
-        ))
+        contactos.append(
+            ContactoTramiteResponse(
+                id=str(agente["id"]),
+                nombre=agente.get("nombre", "—"),
+                email=None,
+                telefono=None,
+                rol="agente",
+                cua=agente.get("cua"),
+            )
+        )
 
     if analista := (t.get("usuario") or {}):
-        contactos.append(ContactoTramiteResponse(
-            id=str(analista["id"]),
-            nombre=analista.get("nombre", "—"),
-            email=analista.get("email"),
-            telefono=None,
-            rol="analista",
-        ))
+        contactos.append(
+            ContactoTramiteResponse(
+                id=str(analista["id"]),
+                nombre=analista.get("nombre", "—"),
+                email=analista.get("email"),
+                telefono=None,
+                rol="analista",
+            )
+        )
 
     if gerente := (t.get("gerente") or {}):  # noqa: SIM102
         # Evitar duplicado si gerente == analista (caso de analistas-gerentes)
         if str(gerente.get("id")) not in {c.id for c in contactos}:
-            contactos.append(ContactoTramiteResponse(
-                id=str(gerente["id"]),
-                nombre=gerente.get("nombre", "—"),
-                email=gerente.get("email"),
-                telefono=None,
-                rol="gerente",
-            ))
+            contactos.append(
+                ContactoTramiteResponse(
+                    id=str(gerente["id"]),
+                    nombre=gerente.get("nombre", "—"),
+                    email=gerente.get("email"),
+                    telefono=None,
+                    rol="gerente",
+                )
+            )
 
     return contactos

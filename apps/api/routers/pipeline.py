@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router de control del pipeline de agentes IA.
 
 POST   /pipeline/tramites/{id}/iniciar          â€” dispara el pipeline para un trÃ¡mite
@@ -23,14 +23,13 @@ from models.usuario import RolUsuario, UsuarioToken
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
-_SOLO_DIRECTORES = [
-    Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))
-]
+_SOLO_DIRECTORES = [Depends(require_roles(RolUsuario.director_general, RolUsuario.director_ops))]
 
 
 # ---------------------------------------------------------------------------
 # Modelos
 # ---------------------------------------------------------------------------
+
 
 class IniciarPipelineBody(BaseModel):
     correo_id: UUID | None = Field(
@@ -64,10 +63,14 @@ class RequiereAtencionBody(BaseModel):
 
 class EstadoPipelineResponse(BaseModel):
     tramite_id: UUID
-    paso_actual: str | None = Field(description="Agente actualmente procesando el trÃ¡mite. NULL si no hay pipeline activo.")
+    paso_actual: str | None = Field(
+        description="Agente actualmente procesando el trÃ¡mite. NULL si no hay pipeline activo."
+    )
     paso_inicio: datetime | None = Field(description="CuÃ¡ndo iniciÃ³ el paso actual.")
     requiere_atencion: bool = Field(description="True si el pipeline escalÃ³ a revisiÃ³n humana.")
-    ultimo_agente_log: dict | None = Field(description="Ãšltimo registro de agente_ia_log para este trÃ¡mite.")
+    ultimo_agente_log: dict | None = Field(
+        description="Ãšltimo registro de agente_ia_log para este trÃ¡mite."
+    )
 
     model_config = {"from_attributes": True}
 
@@ -89,6 +92,7 @@ class ReintentoPipelineResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # POST /pipeline/tramites/{id}/iniciar
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/tramites/{tramite_id}/iniciar",
@@ -118,18 +122,31 @@ async def iniciar_pipeline(
         )
 
     db = get_admin_db()
-    tramite = db.table("tramite").select("id, estado, paso_pipeline_actual, activo").eq("id", str(tramite_id)).maybe_single().execute()
+    tramite = (
+        db.table("tramite")
+        .select("id, estado, paso_pipeline_actual, activo")
+        .eq("id", str(tramite_id))
+        .maybe_single()
+        .execute()
+    )
 
     if not tramite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "TRAMITE_NO_ENCONTRADO", "mensaje": "TrÃ¡mite no encontrado.", "tramite_id": str(tramite_id)},
+            detail={
+                "error_code": "TRAMITE_NO_ENCONTRADO",
+                "mensaje": "TrÃ¡mite no encontrado.",
+                "tramite_id": str(tramite_id),
+            },
         )
 
     if not tramite.data.get("activo"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"error_code": "TRAMITE_INACTIVO", "mensaje": "No se puede iniciar el pipeline en un trÃ¡mite inactivo."},
+            detail={
+                "error_code": "TRAMITE_INACTIVO",
+                "mensaje": "No se puede iniciar el pipeline en un trÃ¡mite inactivo.",
+            },
         )
 
     if tramite.data.get("paso_pipeline_actual") and not body.forzar:
@@ -143,10 +160,12 @@ async def iniciar_pipeline(
         )
 
     # Actualizar paso_pipeline_actual en el trÃ¡mite
-    db.table("tramite").update({
-        "paso_pipeline_actual": body.agente_inicio,
-        "paso_pipeline_inicio": datetime.utcnow().isoformat(),
-    }).eq("id", str(tramite_id)).execute()
+    db.table("tramite").update(
+        {
+            "paso_pipeline_actual": body.agente_inicio,
+            "paso_pipeline_inicio": datetime.utcnow().isoformat(),
+        }
+    ).eq("id", str(tramite_id)).execute()
 
     log.info(
         "pipeline_iniciado",
@@ -168,6 +187,7 @@ async def iniciar_pipeline(
 # POST /pipeline/tramites/{id}/requiere-atencion
 # ---------------------------------------------------------------------------
 
+
 @router.post(
     "/tramites/{tramite_id}/requiere-atencion",
     status_code=status.HTTP_200_OK,
@@ -186,7 +206,9 @@ async def marcar_requiere_atencion(
 ) -> dict:
     db = get_admin_db()
 
-    tramite = db.table("tramite").select("id, activo").eq("id", str(tramite_id)).maybe_single().execute()
+    tramite = (
+        db.table("tramite").select("id, activo").eq("id", str(tramite_id)).maybe_single().execute()
+    )
     if not tramite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -194,22 +216,26 @@ async def marcar_requiere_atencion(
         )
 
     # Marcar el trÃ¡mite y limpiar el paso de pipeline
-    db.table("tramite").update({
-        "requiere_atencion": True,
-        "paso_pipeline_actual": None,
-        "paso_pipeline_inicio": None,
-    }).eq("id", str(tramite_id)).execute()
+    db.table("tramite").update(
+        {
+            "requiere_atencion": True,
+            "paso_pipeline_actual": None,
+            "paso_pipeline_inicio": None,
+        }
+    ).eq("id", str(tramite_id)).execute()
 
     # Registrar evento en el timeline
-    db.table("tramite_evento").insert({
-        "tramite_id": str(tramite_id),
-        "tipo_evento": "accion_agente_ia",
-        "agente_ia_nombre": body.agente_nombre,
-        "descripcion": f"[REQUIERE ATENCIÃ“N] {body.motivo}",
-        "datos": body.datos,
-        "visible_en_timeline": True,
-        "origen_sistema": body.agente_nombre,
-    }).execute()
+    db.table("tramite_evento").insert(
+        {
+            "tramite_id": str(tramite_id),
+            "tipo_evento": "accion_agente_ia",
+            "agente_ia_nombre": body.agente_nombre,
+            "descripcion": f"[REQUIERE ATENCIÃ“N] {body.motivo}",
+            "datos": body.datos,
+            "visible_en_timeline": True,
+            "origen_sistema": body.agente_nombre,
+        }
+    ).execute()
 
     log.info(
         "tramite_requiere_atencion",
@@ -228,6 +254,7 @@ async def marcar_requiere_atencion(
 # ---------------------------------------------------------------------------
 # GET /pipeline/tramites/{id}/estado
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/tramites/{tramite_id}/estado",
@@ -274,7 +301,9 @@ async def obtener_estado_pipeline(
     return EstadoPipelineResponse(
         tramite_id=tramite_id,
         paso_actual=t.get("paso_pipeline_actual"),
-        paso_inicio=datetime.fromisoformat(t["paso_pipeline_inicio"]) if t.get("paso_pipeline_inicio") else None,
+        paso_inicio=datetime.fromisoformat(t["paso_pipeline_inicio"])
+        if t.get("paso_pipeline_inicio")
+        else None,
         requiere_atencion=t.get("requiere_atencion", False),
         ultimo_agente_log=ultimo_log,
     )
@@ -283,6 +312,7 @@ async def obtener_estado_pipeline(
 # ---------------------------------------------------------------------------
 # GET /pipeline/reintentos
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/reintentos",
@@ -297,8 +327,12 @@ async def obtener_estado_pipeline(
     ),
 )
 async def listar_reintentos(
-    estado: str | None = Query(default="pendiente", description="Estado del reintento: pendiente, completado, abandonado."),
-    agente_nombre: str | None = Query(default=None, description="Filtrar por nombre de agente (agente_1 a agente_6)."),
+    estado: str | None = Query(
+        default="pendiente", description="Estado del reintento: pendiente, completado, abandonado."
+    ),
+    agente_nombre: str | None = Query(
+        default=None, description="Filtrar por nombre de agente (agente_1 a agente_6)."
+    ),
     limit: int = Query(default=50, ge=1, le=200),
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> list[ReintentoPipelineResponse]:
@@ -318,6 +352,7 @@ async def listar_reintentos(
 # GET /pipeline/schema/estados
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/schema/estados",
     summary="Grafo de transiciones de estado del trÃ¡mite",
@@ -336,8 +371,5 @@ async def obtener_schema_estados(
             estado.value: [dest.value for dest in destinos]
             for estado, destinos in TRANSICIONES_VALIDAS.items()
         },
-        "estados_terminales": [
-            e.value for e in EstadoTramite
-            if not TRANSICIONES_VALIDAS.get(e)
-        ],
+        "estados_terminales": [e.value for e in EstadoTramite if not TRANSICIONES_VALIDAS.get(e)],
     }

@@ -3,11 +3,27 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2"
+startCommand = "sh -c 'uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2'"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
+healthcheckInterval = 30
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
+restartPolicyMaxRetries = 10
+
+[environments.staging.variables]
+ENVIRONMENT = "staging"
+LOGFIRE_LEVEL = "debug"
+LOGFIRE_SEND_TIMEOUT = "10"
 
 [environments.staging.deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1"
+startCommand = "sh -c 'uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1'"
+healthcheckTimeout = 90
+
+[environments.production.variables]
+ENVIRONMENT = "production"
+LOGFIRE_LEVEL = "warning"
+LOGFIRE_SEND_TIMEOUT = "5"
+
+[environments.production.deploy]
+startCommand = "sh -c 'uvicorn main:app --host 0.0.0.0 --port $PORT --workers 4'"
+healthcheckTimeout = 120

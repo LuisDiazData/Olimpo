@@ -37,6 +37,6 @@ def descifrar_key(ciphertext: str) -> str:
             detail={
                 "error_code": "DESCIFRADO_FALLIDO",
                 "mensaje": "No se pudo descifrar la credencial del tenant. "
-                           "Verifica que ADMIN_ENCRYPTION_KEY es correcta.",
+                "Verifica que ADMIN_ENCRYPTION_KEY es correcta.",
             },
         ) from exc

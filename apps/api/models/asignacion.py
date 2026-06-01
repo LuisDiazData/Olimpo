@@ -13,6 +13,7 @@ from models.usuario import RamoUsuario
 # Asignacion
 # ---------------------------------------------------------------------------
 
+
 class AsignacionCreate(BaseModel):
     agente_id: UUID
     ramo: RamoUsuario
@@ -80,6 +81,7 @@ class ResolverAsignacionResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Cobertura de vacaciones
 # ---------------------------------------------------------------------------
+
 
 class CoberturaVacacionesCreate(BaseModel):
     analista_ausente_id: UUID

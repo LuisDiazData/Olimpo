@@ -33,6 +33,7 @@ router = APIRouter(
 # MODELOS
 # =============================================================================
 
+
 class LicenciaUpdate(BaseModel):
     tipo_plan: Literal["basico", "profesional", "enterprise"] | None = None
     fecha_inicio_licencia: date | None = None
@@ -58,11 +59,16 @@ class LicenciaResponse(BaseModel):
 # HELPERS
 # =============================================================================
 
+
 def _get_tenant_or_404(tenant_id: UUID):
     db = get_admin_db()
-    result = db.table("tenant").select(
-        "id, tipo_plan, fecha_inicio_licencia, fecha_vencimiento_licencia, estado_licencia"
-    ).eq("id", str(tenant_id)).single().execute()
+    result = (
+        db.table("tenant")
+        .select("id, tipo_plan, fecha_inicio_licencia, fecha_vencimiento_licencia, estado_licencia")
+        .eq("id", str(tenant_id))
+        .single()
+        .execute()
+    )
 
     if not result.data:
         raise HTTPException(
@@ -75,6 +81,7 @@ def _get_tenant_or_404(tenant_id: UUID):
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
+
 
 @router.get("", response_model=LicenciaResponse)
 def obtener_licencia(tenant_id: UUID):
@@ -90,7 +97,10 @@ def actualizar_licencia(tenant_id: UUID, body: LicenciaUpdate):
     if not cambios:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error_code": "SIN_CAMBIOS", "mensaje": "Se requiere al menos un campo para actualizar."},
+            detail={
+                "error_code": "SIN_CAMBIOS",
+                "mensaje": "Se requiere al menos un campo para actualizar.",
+            },
         )
 
     db = get_admin_db()
@@ -116,10 +126,17 @@ def renovar_licencia(tenant_id: UUID, body: RenovarLicencia):
     nueva_fecha = date.today() + timedelta(days=body.dias)
 
     db = get_admin_db()
-    result = db.table("tenant").update({
-        "fecha_vencimiento_licencia": nueva_fecha.isoformat(),
-        "estado_licencia": "activa",
-    }).eq("id", str(tenant_id)).execute()
+    result = (
+        db.table("tenant")
+        .update(
+            {
+                "fecha_vencimiento_licencia": nueva_fecha.isoformat(),
+                "estado_licencia": "activa",
+            }
+        )
+        .eq("id", str(tenant_id))
+        .execute()
+    )
 
     if not result.data:
         raise HTTPException(
@@ -127,7 +144,12 @@ def renovar_licencia(tenant_id: UUID, body: RenovarLicencia):
             detail={"error_code": "TENANT_NO_ENCONTRADO", "mensaje": "Tenant no encontrado."},
         )
 
-    log.info("licencia_renovada", tenant_id=str(tenant_id), nueva_fecha=nueva_fecha.isoformat(), dias=body.dias)
+    log.info(
+        "licencia_renovada",
+        tenant_id=str(tenant_id),
+        nueva_fecha=nueva_fecha.isoformat(),
+        dias=body.dias,
+    )
     data = result.data[0]
     return {**data, "tenant_id": data["id"]}
 
@@ -136,7 +158,12 @@ def renovar_licencia(tenant_id: UUID, body: RenovarLicencia):
 def suspender_licencia(tenant_id: UUID):
     """Cambia el estado de la licencia a 'suspendida'."""
     db = get_admin_db()
-    result = db.table("tenant").update({"estado_licencia": "suspendida"}).eq("id", str(tenant_id)).execute()
+    result = (
+        db.table("tenant")
+        .update({"estado_licencia": "suspendida"})
+        .eq("id", str(tenant_id))
+        .execute()
+    )
 
     if not result.data:
         raise HTTPException(
@@ -153,7 +180,9 @@ def suspender_licencia(tenant_id: UUID):
 def activar_licencia(tenant_id: UUID):
     """Cambia el estado de la licencia a 'activa'."""
     db = get_admin_db()
-    result = db.table("tenant").update({"estado_licencia": "activa"}).eq("id", str(tenant_id)).execute()
+    result = (
+        db.table("tenant").update({"estado_licencia": "activa"}).eq("id", str(tenant_id)).execute()
+    )
 
     if not result.data:
         raise HTTPException(

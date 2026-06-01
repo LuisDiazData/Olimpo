@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Plus, Trash2, Pencil, Wifi, Mail, Phone, CheckCircle2 } from "lucide-react"
+import { Trash2, Pencil, Wifi, Mail, Phone, CheckCircle2 } from "lucide-react"
 import { SlideOver } from "@/components/ui/slide-over"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { AgenteDetail, TelefonoItem, EmailItem, AsistenteItem } from "./types"
+import type { AgenteDetail, AsistenteItem } from "./types"
 
 const TIPO_TELEFONO_LABELS: Record<string, string> = {
   celular:  "Celular",

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Router de coberturas de vacaciones.
 
 GET    /coberturas           â€” coberturas activas (gerentes/directores)
@@ -30,12 +30,19 @@ _GERENTES_Y_DIRECTORES = [
 # Modelos
 # ---------------------------------------------------------------------------
 
+
 class CoberturaCreate(BaseModel):
-    analista_ausente_id: UUID = Field(description="UUID del analista que estarÃ¡ ausente por vacaciones.")
-    analista_cobertura_id: UUID = Field(description="UUID del analista que cubrirÃ¡ durante la ausencia.")
+    analista_ausente_id: UUID = Field(
+        description="UUID del analista que estarÃ¡ ausente por vacaciones."
+    )
+    analista_cobertura_id: UUID = Field(
+        description="UUID del analista que cubrirÃ¡ durante la ausencia."
+    )
     fecha_inicio: date = Field(description="Primer dÃ­a de ausencia (inclusive).")
     fecha_fin: date = Field(description="Ãšltimo dÃ­a de ausencia (inclusive).")
-    notas: str | None = Field(default=None, max_length=500, description="Notas adicionales sobre la cobertura.")
+    notas: str | None = Field(
+        default=None, max_length=500, description="Notas adicionales sobre la cobertura."
+    )
 
     @model_validator(mode="after")
     def validar_fechas(self) -> "CoberturaCreate":
@@ -68,6 +75,7 @@ class CoberturaResponse(BaseModel):
 # GET /coberturas
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "",
     response_model=list[CoberturaResponse],
@@ -80,8 +88,12 @@ class CoberturaResponse(BaseModel):
     ),
 )
 async def listar_coberturas(
-    solo_activas: bool = Query(default=True, description="True para ver solo coberturas actualmente vigentes."),
-    analista_id: UUID | None = Query(default=None, description="UUID del analista (ausente o cobertura) para filtrar."),
+    solo_activas: bool = Query(
+        default=True, description="True para ver solo coberturas actualmente vigentes."
+    ),
+    analista_id: UUID | None = Query(
+        default=None, description="UUID del analista (ausente o cobertura) para filtrar."
+    ),
     usuario: UsuarioToken = Depends(get_current_user),
 ) -> list[CoberturaResponse]:
     db = get_user_db(usuario.access_token)
@@ -116,6 +128,7 @@ async def listar_coberturas(
 # ---------------------------------------------------------------------------
 # GET /coberturas/vigentes
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/vigentes",
@@ -161,6 +174,7 @@ async def coberturas_vigentes(
 # ---------------------------------------------------------------------------
 # POST /coberturas
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "",
@@ -224,6 +238,7 @@ async def crear_cobertura(
 # DELETE /coberturas/{id}
 # ---------------------------------------------------------------------------
 
+
 @router.delete(
     "/{cobertura_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -241,11 +256,20 @@ async def eliminar_cobertura(
 ) -> None:
     db = get_user_db(usuario.access_token)
 
-    result = db.table("cobertura_vacaciones").select("id, fecha_inicio, fecha_fin").eq("id", str(cobertura_id)).maybe_single().execute()
+    result = (
+        db.table("cobertura_vacaciones")
+        .select("id, fecha_inicio, fecha_fin")
+        .eq("id", str(cobertura_id))
+        .maybe_single()
+        .execute()
+    )
     if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error_code": "COBERTURA_NO_ENCONTRADA", "mensaje": "Cobertura de vacaciones no encontrada."},
+            detail={
+                "error_code": "COBERTURA_NO_ENCONTRADA",
+                "mensaje": "Cobertura de vacaciones no encontrada.",
+            },
         )
 
     db.table("cobertura_vacaciones").delete().eq("id", str(cobertura_id)).execute()

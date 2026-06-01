@@ -189,7 +189,7 @@ export function ConfigurarAsignaciones({
       {/* ── Tabs de ramo ── */}
       <div className="flex gap-1 rounded-xl border bg-slate-100 p-1 w-fit">
         {RAMOS.map((r) => {
-          const sinAnalista = agentes.filter(
+          const _sinAnalista = agentes.filter(
             (a) => a.activo && !asignPorAgente[a.id]
           ).length
           return (

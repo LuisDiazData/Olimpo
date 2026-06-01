@@ -80,7 +80,7 @@ export function GNPRejectionChart({ data }: Props) {
             dataKey="pct_rechazo"
             position="top"
             fontSize={10}
-            formatter={(val) => (typeof val === "number" && val > 0 ? `${val}%` : "")}
+            formatter={(val: unknown) => (Number(val) > 0 ? `${val}%` : "")}
           />
         </Bar>
       </BarChart>

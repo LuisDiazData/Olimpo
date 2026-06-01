@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { cn } from "@/lib/utils"
 import { TramiteDetalleDrawer } from "./tramite-detalle-drawer"
 import { TramitesTarjetas } from "./tramites-tarjetas"
 import { TramitesTabla } from "./tramites-tabla"

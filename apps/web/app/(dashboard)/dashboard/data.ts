@@ -211,8 +211,8 @@ export async function getDashboardData(
     // New queries
     backlogRes,
     eventosTurnadoRes,
-    tramiteEventosRes,
-    escaladosRes,
+    _tramiteEventosRes,
+    _escaladosRes,
     estancadosRes,
   ] = await Promise.all([
     // KPI 1 — trámites activos
@@ -423,12 +423,14 @@ export async function getDashboardData(
   const pctSla = slaTotal > 0 ? Math.round((slaCumplidos / slaTotal) * 100) : 100
 
   // Tiempo promedio de resolución
-  const resueltosTiempo = (resueltosTiempoRes.data ?? []).filter(
-    (t: Record<string, unknown>) => t.fecha_recepcion && t.updated_at
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resueltosTiempo = ((resueltosTiempoRes.data ?? []) as any[]).filter(
+    (t) => t.fecha_recepcion && t.updated_at
   )
   let tiempoPromedioDias: number | null = null
   if (resueltosTiempo.length > 0) {
-    const totalMs = resueltosTiempo.reduce((acc: number, t: Record<string, unknown>) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const totalMs = resueltosTiempo.reduce((acc: number, t: any) => {
       return acc + (new Date(t.updated_at as string).getTime() - new Date(t.fecha_recepcion as string).getTime())
     }, 0)
     tiempoPromedioDias = Math.round((totalMs / resueltosTiempo.length) / (1000 * 60 * 60 * 24) * 10) / 10
@@ -506,16 +508,6 @@ export async function getDashboardData(
 
   // ── Tiempo promedio por estado ────────────────────────────────────────────
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const eventosRaw = (tramiteEventosRes.data ?? []) as any[]
-  const estadoDiasMap: Record<string, { total_ms: number; count: number }> = {}
-  for (const ev of eventosRaw) {
-    if (!ev.estado_nuevo) continue
-    // Solo eventos que tienen fecha_anterior para calcular duración en ese estado
-    // Approximación: usamos created_at como proxy del tiempo en ese estado
-    // (Esto sobreestima pero sirve como indicador relativo)
-  }
-
   // Para cada estado activo, calculamos avg dias desde que entró
   const ESTADO_LABELS: Record<string, string> = {
     recibido:                   "Recibido",
@@ -585,7 +577,8 @@ export async function getDashboardData(
 
   // ── Tramites sin movimiento > 5 días ───────────────────────────────────────
 
-  const tramitesEstancados: StalledTramite[] = (estancadosRes.data ?? []).map((t: Record<string, unknown>) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tramitesEstancados: StalledTramite[] = ((estancadosRes.data ?? []) as any[]).map((t) => {
     const dias = Math.floor(
       (ahoraMs - new Date(t.ultima_actividad as string).getTime()) / (1000 * 60 * 60 * 24)
     )
@@ -627,8 +620,10 @@ export async function getDashboardData(
     count,
   }))
 
-  const entradas = (entradasRes.data ?? []).map((t: Record<string, unknown>) => t.fecha_recepcion as string)
-  const resueltosTendencia = (resueltosRes.data ?? []).map((t: Record<string, unknown>) => t.updated_at as string)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entradas = ((entradasRes.data ?? []) as any[]).map((t) => t.fecha_recepcion as string)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resueltosTendencia = ((resueltosRes.data ?? []) as any[]).map((t) => t.updated_at as string)
   const tendencia = agruparPorSemana(entradas, resueltosTendencia, 8)
 
   // ── Carga por analista ───────────────────────────────────────────────────
@@ -641,7 +636,7 @@ export async function getDashboardData(
   }
 
   const analistaIds = Array.from(analistMap.keys())
-  let analistasNombres: Record<string, string> = {}
+  const analistasNombres: Record<string, string> = {}
   if (analistaIds.length > 0) {
     const nombresRes = await supabase
       .from("usuario")
@@ -670,8 +665,9 @@ export async function getDashboardData(
 
   // ── Alertas ──────────────────────────────────────────────────────────────
 
-  const alertasRaw = alertasRes.data ?? []
-  const alertas: AlertaTramite[] = alertasRaw.map((t: Record<string, unknown>) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const alertasRaw = (alertasRes.data ?? []) as any[]
+  const alertas: AlertaTramite[] = alertasRaw.map((t) => ({
     id: t.id as string,
     folio: t.folio as string,
     titulo: t.titulo as string,

@@ -8,6 +8,7 @@ Convenciones:
     SUPABASE_JWT_SECRET de un .env.test.
   - Los LLMs se mockean con LiteLLM fake mode (LITELLM_MOCK=true).
 """
+
 import os
 
 # Configurar variables de entorno ANTES de cualquier import que llame a get_settings().
@@ -33,6 +34,7 @@ from main import app
 # ---------------------------------------------------------------------------
 # Helpers para generar JWTs de test
 # ---------------------------------------------------------------------------
+
 
 def make_test_jwt(
     user_id: UUID | None = None,
@@ -63,6 +65,7 @@ def make_test_jwt(
 # Fixtures de usuarios de test
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def analista_token() -> str:
     return make_test_jwt(rol="analista", ramo="vida")
@@ -81,6 +84,7 @@ def director_token() -> str:
 # ---------------------------------------------------------------------------
 # Cliente HTTP de test
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def client() -> TestClient:

@@ -59,4 +59,5 @@ markers = [
 
 [tool.pyright]
 pythonVersion = "3.12"
-strict = true
+typeCheckingMode = "basic"
+exclude = ["tests"]

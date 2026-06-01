@@ -28,6 +28,7 @@ router = APIRouter(
 # MODELOS
 # =============================================================================
 
+
 class UltimaAltaItem(BaseModel):
     id: UUID
     nombre: str
@@ -42,13 +43,16 @@ class StatsResponse(BaseModel):
     suspendidas: int = Field(description="Tenants con licencia suspendida")
     en_prueba: int = Field(description="Tenants en periodo de prueba")
     expiradas: int = Field(description="Tenants con licencia expirada")
-    venciendo_30_dias: int = Field(description="Tenants cuya licencia vence en los próximos 30 días")
+    venciendo_30_dias: int = Field(
+        description="Tenants cuya licencia vence en los próximos 30 días"
+    )
     ultimas_altas: list[UltimaAltaItem] = Field(description="Los 5 tenants más recientes")
 
 
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
+
 
 @router.get("", response_model=StatsResponse)
 def obtener_stats():
@@ -58,9 +62,13 @@ def obtener_stats():
     """
     db = get_admin_db()
 
-    todos = db.table("tenant").select(
-        "id, nombre, subdominio, estado_licencia, fecha_vencimiento_licencia, created_at"
-    ).order("created_at", desc=True).execute().data
+    todos = (
+        db.table("tenant")
+        .select("id, nombre, subdominio, estado_licencia, fecha_vencimiento_licencia, created_at")
+        .order("created_at", desc=True)
+        .execute()
+        .data
+    )
 
     limite_30 = date.today() + timedelta(days=30)
 
