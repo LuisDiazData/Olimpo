@@ -248,7 +248,7 @@ export function TramiteDetalleDrawer({ tramite, onClose, onTramiteUpdated }: Tra
       setDocumentos(doc.data ?? [])
       setComunicaciones(com.data ?? [])
       setContactos(cont.data ?? [])
-      setAnalistas(analy ?? [])
+      setAnalistas(analy.data ?? [])
       setLoading(false)
     })
   }, [tramite, puedeReasignar])
