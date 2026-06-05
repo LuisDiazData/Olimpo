@@ -72,3 +72,5 @@ olimpo_modelo_datos_erd.html
 #-----Mcp-----
 .mcp.json
 opencode.json
+.vercel
+.env*

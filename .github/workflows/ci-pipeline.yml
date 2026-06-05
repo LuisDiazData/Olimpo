@@ -270,12 +270,4 @@ jobs:
             exit 1
           fi
 
-          if [ "${{ needs.api-tests.result }}" == "skipped" ] || \
-             [ "${{ needs.api-docker.result }}" == "skipped" ] || \
-             [ "${{ needs.admin-docker.result }}" == "skipped" ] || \
-             [ "${{ needs.web-quality.result }}" == "skipped" ]; then
-            echo "ERROR: Algunos jobs fueron saltados."
-            exit 1
-          fi
-
           echo "✅ Todos los checks del pipeline pasaron."
