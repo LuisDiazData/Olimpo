@@ -17,6 +17,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from core.auth import get_current_user, require_permiso, require_roles
+from core.busqueda import filtro_busqueda_or
 from core.database import get_admin_db, get_user_db
 from models.correo import CorreoTramiteItem, DocumentoListItem
 from models.pagination import PaginatedResponse
@@ -175,7 +176,7 @@ async def listar_tramites(
         if requiere_atencion is not None:
             q_builder = q_builder.eq("requiere_atencion", requiere_atencion)
         if q:
-            q_builder = q_builder.or_(f"folio.ilike.%{q}%,titulo.ilike.%{q}%")
+            q_builder = q_builder.or_(filtro_busqueda_or(q, "folio", "titulo"))
         return q_builder
 
     # Contar total para metadatos de paginaciÃ³n

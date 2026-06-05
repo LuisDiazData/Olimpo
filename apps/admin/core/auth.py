@@ -6,6 +6,8 @@ El panel Admin también está protegido por IP allowlist en el middleware de mai
 La doble protección (IP + API key) compensa la simplicidad del esquema.
 """
 
+import hmac
+
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
@@ -20,7 +22,9 @@ def require_superadmin(api_key: str = Security(_api_key_header)) -> None:
     Uso: dependencies=[Depends(require_superadmin)]
     """
     s = get_settings()
-    if api_key != s.ADMIN_API_KEY:
+    # Comparación en tiempo constante para evitar timing attacks sobre la
+    # credencial maestra del sistema (hmac.compare_digest no hace short-circuit).
+    if not hmac.compare_digest(api_key, s.ADMIN_API_KEY):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={

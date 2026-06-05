@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     ADMIN_ALLOWED_IPS: str = "127.0.0.1,::1"
 
+    # Número de proxies de confianza delante de la app (en Railway: 1).
+    # La IP real del cliente es el N-ésimo valor desde el final de X-Forwarded-For.
+    # NO usar el primer valor del header: ese lo controla el cliente y es falsificable.
+    ADMIN_TRUSTED_PROXY_COUNT: int = 1
+
     # -------------------------------------------------------------------------
     # App
     # -------------------------------------------------------------------------

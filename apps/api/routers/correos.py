@@ -27,6 +27,7 @@ import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
 from core.auth import get_current_user, require_roles
+from core.busqueda import filtro_busqueda_or
 from core.database import get_user_db
 from models.correo import (
     AdjuntoResponse,
@@ -172,7 +173,7 @@ async def listar_correos(
         if thread_id:
             q_builder = q_builder.eq("thread_id", thread_id)
         if q:
-            q_builder = q_builder.or_(f"asunto.ilike.%{q}%,de_email.ilike.%{q}%")
+            q_builder = q_builder.or_(filtro_busqueda_or(q, "asunto", "de_email"))
         return q_builder
 
     count_result = _apply_filters(db.table("correo").select("id", count="exact")).execute()
