@@ -312,7 +312,7 @@ pyroaring==1.1.0
     # via pyiceberg
 python-dateutil==2.9.0.post0
     # via strictyaml
-python-dotenv==1.0.1
+python-dotenv==1.2.2
     # via
     #   litellm
     #   pydantic-settings
