@@ -7,6 +7,7 @@ Arranque:
 Acceso exclusivo: IP allowlist + X-Admin-API-Key en cada request.
 """
 
+import hmac
 import ipaddress
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -92,6 +93,11 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def ip_allowlist(request: Request, call_next):
         if request.url.path == "/health":
+            return await call_next(request)
+        # Requests con API key válida (llamadas server-to-server desde el frontend)
+        # no requieren estar en el IP allowlist — la key es suficiente segunda capa.
+        api_key = request.headers.get("x-admin-api-key", "")
+        if api_key and hmac.compare_digest(api_key, s.ADMIN_API_KEY):
             return await call_next(request)
         client_ip = _resolver_ip_cliente(request, s.ADMIN_TRUSTED_PROXY_COUNT)
         if client_ip is None or not _ip_permitida(client_ip, s.allowed_ips):
