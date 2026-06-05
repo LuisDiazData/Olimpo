@@ -22,6 +22,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from core.auth import get_current_user, require_roles
+from core.busqueda import filtro_busqueda_or
 from core.database import get_admin_db_dep, get_user_db
 from models.poliza import (
     AseguradoBuscarOCrearBody,
@@ -79,7 +80,7 @@ async def buscar_asegurados(
     if activo is not None:
         query = query.eq("activo", activo)
     if q:
-        query = query.or_(f"nombre.ilike.%{q}%,rfc.ilike.%{q}%")
+        query = query.or_(filtro_busqueda_or(q, "nombre", "rfc"))
 
     result = query.order("nombre").range(offset, offset + limit - 1).execute()
     return [AseguradoListItem.model_validate(a) for a in result.data]

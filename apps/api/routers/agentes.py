@@ -33,6 +33,7 @@ from openpyxl.utils import get_column_letter
 from supabase import Client
 
 from core.auth import get_current_user, require_roles
+from core.busqueda import filtro_busqueda_or
 from core.database import get_admin_db, get_db
 from models.agente import (
     AgenteCreate,
@@ -94,7 +95,7 @@ def listar_agentes(
         query = query.eq("activo", activo)
 
     if q:
-        query = query.or_(f"nombre.ilike.%{q}%,cua.ilike.%{q}%")
+        query = query.or_(filtro_busqueda_or(q, "nombre", "cua"))
 
     result = query.order("nombre").range(offset, offset + limit - 1).execute()
 

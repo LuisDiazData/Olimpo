@@ -28,6 +28,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("olimpo_admin_detenida")
 
 
+def _resolver_ip_cliente(request: Request, trusted_proxy_count: int) -> str | None:
+    """
+    Devuelve la IP real del cliente de forma resistente a spoofing de X-Forwarded-For.
+
+    El cliente puede prepender valores arbitrarios al header, pero cada proxy de
+    confianza añade al final la IP del peer del que recibió la conexión. Por eso
+    la IP del cliente es el `trusted_proxy_count`-ésimo valor desde el final.
+    Si el header trae menos saltos de los esperados, la cadena de proxies no es
+    la configurada → se rechaza (fail-closed) devolviendo None.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        partes = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if len(partes) >= trusted_proxy_count >= 1:
+            return partes[-trusted_proxy_count]
+        return None
+    return request.client.host if request.client else None
+
+
 def create_app() -> FastAPI:
     s = get_settings()
 
@@ -46,18 +65,17 @@ def create_app() -> FastAPI:
     #
     # IMPORTANTE: en Railway (y otros PaaS) el tráfico pasa por un reverse proxy.
     # request.client.host devuelve la IP del proxy, no la del cliente real.
-    # La IP del cliente viene en X-Forwarded-For (formato: "cliente, proxy1, proxy2").
+    # La IP real viene en X-Forwarded-For, pero ese header es controlado por el
+    # cliente: cualquiera puede prepender valores falsos. El proxy de confianza
+    # SIEMPRE añade la IP TCP real al final, así que la IP del cliente es el
+    # ADMIN_TRUSTED_PROXY_COUNT-ésimo valor desde el final. NUNCA el primero.
     # -------------------------------------------------------------------------
     @app.middleware("http")
     async def ip_allowlist(request: Request, call_next):
         if request.url.path == "/health":
             return await call_next(request)
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
-        else:
-            client_ip = request.client.host if request.client else ""
-        if client_ip not in s.allowed_ips:
+        client_ip = _resolver_ip_cliente(request, s.ADMIN_TRUSTED_PROXY_COUNT)
+        if client_ip is None or client_ip not in s.allowed_ips:
             log.warning("acceso_denegado_ip", ip=client_ip, path=request.url.path)
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,

@@ -42,10 +42,14 @@ def get_user_db(access_token: str) -> Client:
     Cliente Supabase autenticado como el usuario actual.
     El PostgREST respeta las policies RLS usando el JWT del usuario.
     Reutiliza el cliente HTTP compartido con pooling para rendimiento óptimo.
+
+    Se construye con la ANON_KEY (no la service_role) para que el modo de falla
+    sea fail-closed: si el JWT del usuario no se aplicara correctamente, el cliente
+    operaría como rol anónimo (RLS niega todo) en lugar de service_role (RLS bypass).
     """
     s = get_settings()
     options = ClientOptions(httpx_client=_shared_http_client)
-    client = create_client(s.SUPABASE_URL, s.SUPABASE_SERVICE_ROLE_KEY, options=options)
+    client = create_client(s.SUPABASE_URL, s.SUPABASE_ANON_KEY, options=options)
     client.postgrest.auth(access_token)
     return client
 
