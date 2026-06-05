@@ -7,6 +7,7 @@ Arranque:
 Acceso exclusivo: IP allowlist + X-Admin-API-Key en cada request.
 """
 
+import ipaddress
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -26,6 +27,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("olimpo_admin_arrancando", environment=s.ENVIRONMENT)
     yield
     log.info("olimpo_admin_detenida")
+
+
+def _ip_permitida(ip: str, allowed: set[str]) -> bool:
+    """Verifica si una IP está en la lista de permitidas (IPs exactas o rangos CIDR)."""
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    for entry in allowed:
+        try:
+            if "/" in entry:
+                if addr in ipaddress.ip_network(entry, strict=False):
+                    return True
+            elif addr == ipaddress.ip_address(entry):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def _resolver_ip_cliente(request: Request, trusted_proxy_count: int) -> str | None:
@@ -75,7 +94,7 @@ def create_app() -> FastAPI:
         if request.url.path == "/health":
             return await call_next(request)
         client_ip = _resolver_ip_cliente(request, s.ADMIN_TRUSTED_PROXY_COUNT)
-        if client_ip is None or client_ip not in s.allowed_ips:
+        if client_ip is None or not _ip_permitida(client_ip, s.allowed_ips):
             log.warning("acceso_denegado_ip", ip=client_ip, path=request.url.path)
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
