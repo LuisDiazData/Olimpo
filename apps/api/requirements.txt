@@ -182,7 +182,7 @@ jsonschema==4.23.0
     # via litellm
 jsonschema-specifications==2025.9.1
     # via jsonschema
-litellm==1.83.7
+litellm==1.83.10
     # via olimpo-api (pyproject.toml)
 logfire[fastapi]==4.34.0
     # via olimpo-api (pyproject.toml)
