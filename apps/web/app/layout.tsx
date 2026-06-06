@@ -31,11 +31,16 @@ export default async function RootLayout({
     if (session?.user) {
       const u = session.user
       initialUser = { id: u.id, email: u.email ?? "" }
-      initialPerfil = {
+      // Leer el perfil real desde la tabla usuario para obtener el rol correcto.
+      // app_metadata puede no tener el rol si no se sincroniza al crear el usuario.
+      const { data: perfil } = await supabase
+        .from("usuario")
+        .select("id, email, nombre, rol, ramo")
+        .eq("id", u.id)
+        .single()
+      initialPerfil = perfil ?? {
         id: u.id,
         email: u.email ?? "",
-        // El nombre real se carga en background por UserProvider vía /api/auth/me.
-        // Usamos email como placeholder para que no quede vacío.
         nombre: u.email?.split("@")[0] ?? "Usuario",
         rol: (u.app_metadata?.rol as string) ?? "analista",
         ramo: (u.app_metadata?.ramo as string | null) ?? null,
