@@ -15,13 +15,18 @@ interface Props {
 type Step = "upload" | "result"
 
 function parseErrorDetail(data: unknown): string {
+  if (typeof data === "string" && data.length > 0) return data
   if (Array.isArray(data)) {
     return data.map((e) => (e as { msg?: string }).msg || JSON.stringify(e)).join("; ")
   }
-  if (typeof data === "object" && data !== null && "detail" in data) {
-    return String((data as { detail: unknown }).detail)
+  if (typeof data === "object" && data !== null) {
+    const obj = data as Record<string, unknown>
+    if (typeof obj.detail === "string" && obj.detail.length > 0) return obj.detail
+    if (Array.isArray(obj.detail)) {
+      return obj.detail.map((e) => (e as { msg?: string }).msg || JSON.stringify(e)).join("; ")
+    }
   }
-  return "Error al importar"
+  return "Error desconocido al importar"
 }
 
 export function ImportarAgentesModal({ open, onClose, onSuccess }: Props) {
@@ -67,7 +72,7 @@ export function ImportarAgentesModal({ open, onClose, onSuccess }: Props) {
       })
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(parseErrorDetail((data as { detail?: unknown }).detail))
+        throw new Error(parseErrorDetail(data))
       }
       setResult(data as ImportResult)
       setStep("result")

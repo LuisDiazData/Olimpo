@@ -124,10 +124,13 @@ class AgenteCreate(BaseModel):
 
     @field_validator("cua")
     @classmethod
-    def cua_no_vacio(cls, v: str) -> str:
-        if not v.strip():
+    def cua_solo_digitos(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
             raise ValueError("El CUA no puede estar vacío.")
-        return v.strip().upper()
+        if not v.isdigit():
+            raise ValueError("El CUA debe contener únicamente dígitos numéricos.")
+        return v
 
 
 class AgenteUpdate(BaseModel):
@@ -197,8 +200,11 @@ class AgenteImportRow(BaseModel):
 
     @field_validator("cua")
     @classmethod
-    def cua_upper(cls, v: str) -> str:
-        return v.strip().upper()
+    def cua_solo_digitos(cls, v: str) -> str:
+        v = v.strip()
+        if not v.isdigit():
+            raise ValueError("El CUA debe contener únicamente dígitos numéricos.")
+        return v
 
     @field_validator("nombre")
     @classmethod

@@ -26,6 +26,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from pydantic import ValidationError
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -657,22 +658,31 @@ async def importar_agentes(
         def _col(key: str, default=None):
             return row[col_map[key]] if key in col_map and col_map[key] < len(row) else default
 
-        raw = AgenteImportRow(
-            cua=str(_col("cua") or "").strip(),
-            nombre=str(_col("nombre completo") or "").strip(),
-            nombre_comercial=str(_col("nombre comercial") or "").strip() or None,
-            rfc=str(_col("rfc") or "").strip() or None,
-            fecha_afiliacion=str(_col("fecha de afiliación (yyyy-mm-dd)") or "").strip() or None,
-            email=str(_col("correo electrónico") or "").strip() or None,
-            telefono=str(_col("teléfono") or "").strip() or None,
-            tipo_telefono=str(
-                _col("tipo de teléfono (celular/oficina/casa/whatsapp/otro)") or ""
-            ).strip()
-            or None,
-            notas=str(_col("notas") or "").strip() or None,
-        )
-
         row_errors = []
+
+        try:
+            raw = AgenteImportRow(
+                cua=str(_col("cua") or "").strip(),
+                nombre=str(_col("nombre completo") or "").strip(),
+                nombre_comercial=str(_col("nombre comercial") or "").strip() or None,
+                rfc=str(_col("rfc") or "").strip() or None,
+                fecha_afiliacion=str(_col("fecha de afiliación (yyyy-mm-dd)") or "").strip() or None,
+                email=str(_col("correo electrónico") or "").strip() or None,
+                telefono=str(_col("teléfono") or "").strip() or None,
+                tipo_telefono=str(
+                    _col("tipo de teléfono (celular/oficina/casa/whatsapp/otro)") or ""
+                ).strip()
+                or None,
+                notas=str(_col("notas") or "").strip() or None,
+            )
+        except ValidationError as exc:
+            for e in exc.errors():
+                field = e.get("loc", ("campo",))[-1]
+                msg = e.get("msg", "valor inválido")
+                row_errors.append(f"{field}: {msg}")
+            preview_errors.append((idx, "; ".join(row_errors)))
+            continue
+
         if not raw.cua:
             row_errors.append("CUA es requerido")
         if not raw.nombre or len(raw.nombre) < 2:
