@@ -59,6 +59,10 @@ jobs:
     environment:
       name: production
       url: https://app.olimpo.mx
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -72,30 +76,19 @@ jobs:
       - name: Verificar conexión a Supabase
         run: |
           echo "Verificando conexión a Supabase production..."
-          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
-
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Aplicar migraciones pendientes
         run: |
           echo "Aplicando migraciones a producción..."
           echo "⚠️  Ejecutando en modo --dry-run primero para verificar..."
-          supabase db push \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }} \
-            --db-password ${{ secrets.SUPABASE_DB_PASSWORD_PROD }} \
-            --dry-run
+          supabase db push --dry-run
 
       - name: Aplicar migraciones (confirmado)
         if: success()
         run: |
           echo "Aplicando migraciones definitivamente..."
-          supabase db push \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }} \
-            --db-password ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
-
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase db push
 
   deploy-api-prod:
     name: API → Railway producción

@@ -58,6 +58,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     if: needs.setup.outputs.should_skip_migrations != 'true'
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_STAGING }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID_STAGING }}
     steps:
       - uses: actions/checkout@v4
 
@@ -68,24 +72,15 @@ jobs:
       - name: Enlazar directorio de migraciones
         run: ln -sf $GITHUB_WORKSPACE/infra/supabase/migrations $GITHUB_WORKSPACE/supabase/migrations
 
+      - name: Verificar conexión a Supabase
+        run: |
+          echo "Verificando conexión a Supabase staging..."
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
       - name: Aplicar migraciones pendientes
         run: |
           echo "Aplicando migraciones a staging..."
-          supabase db push \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID_STAGING }} \
-            --db-password ${{ secrets.SUPABASE_DB_PASSWORD_STAGING }} \
-            --linked
-
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Verificar schema de tablas
-        run: |
-          echo "Verificando que las migraciones se aplicaron correctamente..."
-          # Intento simple de verificar que supabase CLI linkage funciona
-          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID_STAGING }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase db push
 
   deploy-api-staging:
     name: API → Railway staging
