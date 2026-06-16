@@ -11,7 +11,6 @@ import {
   ROL_ASEGURADO_BADGE,
   formatMoney,
   vigenciaLabel,
-  relativeTime,
 } from "./shared"
 import { ESTADO_BADGE, TIPO_BADGE } from "../tramites/shared"
 import type { PolizaRow, AseguradoVinculo, TramiteDePoliza } from "./types"
