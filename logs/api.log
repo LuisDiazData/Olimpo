@@ -1,0 +1,51 @@
+INFO:     Will watch for changes in these directories: ['/Users/luisdiaz/Documents/Proyectos/Olimpo/apps/api']
+/Users/luisdiaz/Documents/Proyectos/Olimpo/apps/api/main.py:79: LogfireNotConfiguredWarning: Instrumentation will have no effect until `logfire.configure()` has been called. Set the environment variable LOGFIRE_IGNORE_NO_CONFIG=1 or add ignore_no_config=true in pyproject.toml to suppress this warning.
+  logfire.instrument_fastapi(app)
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [1312] using WatchFiles
+/Users/luisdiaz/Documents/Proyectos/Olimpo/apps/api/main.py:79: LogfireNotConfiguredWarning: Instrumentation will have no effect until `logfire.configure()` has been called. Set the environment variable LOGFIRE_IGNORE_NO_CONFIG=1 or add ignore_no_config=true in pyproject.toml to suppress this warning.
+  logfire.instrument_fastapi(app)
+INFO:     Started server process [1331]
+INFO:     Waiting for application startup.
+[2m2026-06-16T01:11:43.240669Z[0m [[32m[1minfo     [0m] [1molimpo_api_arrancando         [0m [36menvironment[0m=[35mdevelopment[0m
+INFO:     Application startup complete.
+19:11:48.466 GET /health
+INFO:     127.0.0.1:55618 - "GET /health HTTP/1.1" 200 OK
+19:11:48.484 GET /health
+INFO:     127.0.0.1:55619 - "GET /health HTTP/1.1" 200 OK
+19:12:04.085 GET /
+INFO:     127.0.0.1:55624 - "GET / HTTP/1.1" 404 Not Found
+19:12:04.414 GET /favicon.ico
+INFO:     127.0.0.1:55624 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+19:16:58.958 GET /api/v1/agentes ? limit='200' & activo='false'
+19:16:59.064 GET /api/v1/agentes ? limit='200' & activo='true'
+INFO:     127.0.0.1:55759 - "GET /api/v1/agentes?limit=200&activo=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55760 - "GET /api/v1/agentes?limit=200&activo=true HTTP/1.1" 200 OK
+19:17:03.554 GET /api/v1/asignaciones ? limit='500' & activo='true'
+19:17:03.562 GET /api/v1/usuarios ? limit='200' & activo='true' & rol='analista'
+INFO:     127.0.0.1:55760 - "GET /api/v1/asignaciones?activo=true&limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55759 - "GET /api/v1/usuarios?rol=analista&activo=true&limit=200 HTTP/1.1" 200 OK
+19:17:15.237 GET /api/v1/usuarios ? limit='200' & activo='true' & rol='analista'
+19:17:15.302 GET /api/v1/agentes ? limit='200' & activo='true'
+19:17:15.305 GET /api/v1/asignaciones ? limit='500' & activo='true'
+INFO:     127.0.0.1:55781 - "GET /api/v1/usuarios?rol=analista&activo=true&limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55786 - "GET /api/v1/asignaciones?activo=true&limit=500 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55785 - "GET /api/v1/agentes?limit=200&activo=true HTTP/1.1" 200 OK
+19:17:16.888 GET /api/v1/usuarios ? limit='200' & activo='false'
+19:17:16.897 GET /api/v1/usuarios ? limit='200' & activo='true'
+INFO:     127.0.0.1:55781 - "GET /api/v1/usuarios?activo=false&limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55785 - "GET /api/v1/usuarios?activo=true&limit=200 HTTP/1.1" 200 OK
+19:17:28.718 GET /api/v1/usuarios ? limit='200' & activo='true'
+19:17:28.727 GET /api/v1/usuarios ? limit='200' & activo='false'
+INFO:     127.0.0.1:55804 - "GET /api/v1/usuarios?activo=false&limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55802 - "GET /api/v1/usuarios?activo=true&limit=200 HTTP/1.1" 200 OK
+19:31:32.723 GET /api/v1/usuarios ? limit='200' & activo='false'
+19:31:32.811 GET /api/v1/usuarios ? limit='200' & activo='true'
+INFO:     127.0.0.1:56243 - "GET /api/v1/usuarios?activo=false&limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56245 - "GET /api/v1/usuarios?activo=true&limit=200 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+[2m2026-06-16T01:31:34.451925Z[0m [[32m[1minfo     [0m] [1molimpo_api_detenida           [0m
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1331]
+INFO:     Stopping reloader process [1312]

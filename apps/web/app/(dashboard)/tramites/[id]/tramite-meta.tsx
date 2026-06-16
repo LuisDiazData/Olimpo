@@ -47,27 +47,49 @@ function SlaBar({ tramite }: { tramite: TramiteDetalle }) {
     rojo: "text-red-700",
   }[tramite.riesgo_sla]
 
-  const dias = Math.floor(
+  // Porcentaje consumido real (vista sla_tramite_vista); fallback a estimación local
+  const diasTranscurridos = Math.floor(
     (Date.now() - new Date(tramite.fecha_recepcion).getTime()) / 86_400_000
   )
+  const pct =
+    tramite.sla_porcentaje_consumido != null
+      ? Math.max(0, Math.min(100, tramite.sla_porcentaje_consumido))
+      : 60
+
+  const diasRestantes = tramite.sla_dias_restantes
+  const vencido =
+    diasRestantes != null
+      ? diasRestantes < 0
+      : !!tramite.fecha_limite_sla && new Date(tramite.fecha_limite_sla) < new Date()
 
   return (
     <div className="space-y-2 py-3">
       <div className="flex items-center justify-between text-xs">
         <span className="font-semibold text-slate-500">SLA</span>
-        {tramite.fecha_limite_sla ? (
-          <span className={cn("font-semibold", textClass)}>
-            {new Date(tramite.fecha_limite_sla) < new Date() ? "Vencido" : "Activo"}
-          </span>
+        {tramite.fecha_limite_sla || tramite.sla_semaforo ? (
+          <span className={cn("font-semibold", textClass)}>{vencido ? "Vencido" : "Activo"}</span>
         ) : (
           <span className="text-slate-400">Sin límite</span>
         )}
       </div>
       <div className="h-1.5 rounded-full bg-slate-100">
-        <div className={cn("h-full rounded-full transition-all", colorClass)} style={{ width: "60%" }} />
+        <div
+          className={cn("h-full rounded-full transition-all", colorClass)}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <div className="flex justify-between text-[11px] text-slate-500">
-        <span>{dias} {dias === 1 ? "día" : "días"} transcurridos</span>
+        {diasRestantes != null ? (
+          <span className={cn(diasRestantes < 0 && "font-semibold text-red-600")}>
+            {diasRestantes < 0
+              ? `Venció hace ${Math.abs(Math.round(diasRestantes))} ${Math.abs(Math.round(diasRestantes)) === 1 ? "día" : "días"}`
+              : `${Math.round(diasRestantes)} ${Math.round(diasRestantes) === 1 ? "día restante" : "días restantes"}`}
+          </span>
+        ) : (
+          <span>
+            {diasTranscurridos} {diasTranscurridos === 1 ? "día" : "días"} transcurridos
+          </span>
+        )}
         {tramite.fecha_limite_sla && (
           <span>Límite: {formatFechaCorta(tramite.fecha_limite_sla).split(",")[0]}</span>
         )}

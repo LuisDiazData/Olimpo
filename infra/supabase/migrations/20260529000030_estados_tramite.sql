@@ -93,7 +93,7 @@ VALUES
 CREATE TABLE estado_tramite_transicion (
     estado_origen_id   TEXT    NOT NULL REFERENCES cat_estado_tramite(id) ON DELETE CASCADE,
     estado_destino_id  TEXT    NOT NULL REFERENCES cat_estado_tramite(id) ON DELETE CASCADE,
-    CHECK (estado_origen_id <> estado_destino_id),
+
     PRIMARY KEY (estado_origen_id, estado_destino_id)
 );
 
@@ -179,8 +179,43 @@ GRANT EXECUTE ON FUNCTION estado_tramite_puede_transicionar(TEXT, TEXT)
 -- 6. Convertir tramite.estado a TEXT con FK
 -- ---------------------------------------------------------------------------
 
+DROP TRIGGER IF EXISTS trg_tramite_registrar_estado ON tramite;
+DROP TRIGGER IF EXISTS trg_tramite_validar_transicion ON tramite;
+
+DROP INDEX IF EXISTS idx_tramite_ultima_actividad;
+DROP INDEX IF EXISTS idx_tramite_sla_vencimiento;
+
 ALTER TABLE tramite
-    ALTER COLUMN estado TYPE TEXT;
+    DROP CONSTRAINT IF EXISTS ck_tramite_analista_requerido,
+    DROP CONSTRAINT IF EXISTS ck_tramite_agente_requerido,
+    DROP CONSTRAINT IF EXISTS ck_tramite_rechazo_consistente;
+
+ALTER TABLE tramite_evento
+    ALTER COLUMN estado_anterior TYPE TEXT,
+    ALTER COLUMN estado_nuevo TYPE TEXT;
+
+ALTER TABLE tramite
+    ALTER COLUMN estado DROP DEFAULT,
+    ALTER COLUMN estado TYPE TEXT,
+    ALTER COLUMN estado SET DEFAULT 'recibido';
+
+ALTER TABLE tramite
+    ADD CONSTRAINT ck_tramite_analista_requerido CHECK (
+        estado IN ('recibido', 'en_revision')
+        OR analista_id IS NOT NULL
+    ),
+    ADD CONSTRAINT ck_tramite_agente_requerido CHECK (
+        estado IN ('recibido', 'en_revision', 'pendiente_documentos_agente')
+        OR agente_id IS NOT NULL
+    ),
+    ADD CONSTRAINT ck_tramite_rechazo_consistente CHECK (
+        motivo_rechazo_gnp IS NULL OR estado = 'rechazado_gnp'
+    );
+
+CREATE TRIGGER trg_tramite_registrar_estado
+    AFTER UPDATE OF estado ON tramite
+    FOR EACH ROW
+    EXECUTE FUNCTION registrar_cambio_estado_tramite();
 
 ALTER TABLE tramite
     DROP CONSTRAINT IF EXISTS tramite_estado_fk,
@@ -218,6 +253,16 @@ CREATE TRIGGER trg_tramite_validar_transicion
 
 -- ---------------------------------------------------------------------------
 -- 8. Migrar datos de estados viejos → nuevos
+CREATE INDEX idx_tramite_ultima_actividad
+    ON tramite (ultima_actividad)
+    WHERE activo = TRUE AND estado NOT IN ('completado', 'rechazado_gnp', 'cancelado');
+
+CREATE INDEX idx_tramite_sla_vencimiento
+    ON tramite (fecha_limite_sla)
+    WHERE fecha_limite_sla IS NOT NULL
+      AND activo = TRUE
+      AND estado NOT IN ('completado', 'rechazado_gnp', 'cancelado');
+
 -- ---------------------------------------------------------------------------
 
 DO $$
@@ -246,7 +291,8 @@ $$;
 -- 9. Reemplazar TYPE estado_tramite (usado en otras columnas/funciones)
 -- ---------------------------------------------------------------------------
 
-DROP TYPE IF EXISTS estado_tramite;
+ALTER TYPE estado_tramite RENAME TO estado_tramite_old;
+
 CREATE TYPE estado_tramite AS ENUM (
     'recibido',
     'en_revision',
@@ -259,6 +305,16 @@ CREATE TYPE estado_tramite AS ENUM (
     'rechazado_gnp',
     'cancelado'
 );
+
+ALTER TABLE sla_definicion ALTER COLUMN estado_inicio TYPE estado_tramite USING estado_inicio::text::estado_tramite;
+ALTER TABLE sla_definicion ALTER COLUMN estado_fin TYPE estado_tramite USING estado_fin::text::estado_tramite;
+
+ALTER TABLE tramite_evento ALTER COLUMN estado_anterior TYPE estado_tramite USING estado_anterior::text::estado_tramite;
+ALTER TABLE tramite_evento ALTER COLUMN estado_nuevo TYPE estado_tramite USING estado_nuevo::text::estado_tramite;
+
+DROP FUNCTION IF EXISTS cambiar_estado_tramite(uuid, estado_tramite_old, text, text, uuid, jsonb);
+
+DROP TYPE estado_tramite_old;
 
 -- ---------------------------------------------------------------------------
 -- 10. Permisos

@@ -240,6 +240,8 @@ COMMENT ON INDEX idx_agente_activo IS
     'Filtrado de agentes activos — el 95%+ de queries de negocio usan activo = TRUE.';
 
 -- Índice sobre nombre para búsqueda fuzzy en la UI (búsqueda de agente por nombre)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 CREATE INDEX idx_agente_nombre
     ON agente USING gin (nombre gin_trgm_ops);
 

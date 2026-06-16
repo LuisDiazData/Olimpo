@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # caché offline o en entornos sin acceso a internet al arranque.
     # Obtener desde: Project Settings → API → JWT Settings → JWKS en Supabase.
     SUPABASE_JWKS_JSON: str = ""
+    
+    # Límites de pooling HTTP para PostgREST
+    SUPABASE_MAX_CONNECTIONS: int = 100
+    SUPABASE_KEEPALIVE_CONNECTIONS: int = 20
 
     @property
     def supabase_jwks(self) -> dict:
@@ -51,6 +55,13 @@ class Settings(BaseSettings):
     GMAIL_WEBHOOK_TOKEN: str = ""
     GMAIL_PUBSUB_TOPIC: str = ""
     SUPABASE_STORAGE_BUCKET_ADJUNTOS: str = "correos-adjuntos"
+
+    # -------------------------------------------------------------------------
+    # Celery & Redis
+    # -------------------------------------------------------------------------
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    REDIS_CACHE_URL: str = ""
 
     # -------------------------------------------------------------------------
     # Observabilidad

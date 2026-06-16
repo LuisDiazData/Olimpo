@@ -203,6 +203,7 @@ class PolizaAseguradoResponse(BaseModel):
     poliza_id: UUID
     asegurado_id: UUID
     asegurado_nombre: str | None = None
+    asegurado_rfc: str | None = None
     rol: RolAsegurado
     parentesco: str | None
     porcentaje: Decimal | None
@@ -227,6 +228,12 @@ class PolizaCreate(BaseModel):
     fecha_fin: date | None = None
     datos_ramo: dict = Field(default_factory=dict)
     notas: str | None = Field(default=None, max_length=2000)
+    
+    # Datos financieros
+    prima_neta: Decimal | None = None
+    moneda: str | None = Field(default="MXN", max_length=3)
+    porcentaje_comision: Decimal | None = None
+    monto_comision: Decimal | None = None
 
     @field_validator("numero_poliza")
     @classmethod
@@ -245,6 +252,12 @@ class PolizaUpdate(BaseModel):
     notas: str | None = Field(default=None, max_length=2000)
     analista_id: UUID | None = None
     activo: bool | None = None
+    
+    # Datos financieros
+    prima_neta: Decimal | None = None
+    moneda: str | None = Field(default=None, max_length=3)
+    porcentaje_comision: Decimal | None = None
+    monto_comision: Decimal | None = None
 
 
 class PolizaListItem(BaseModel):
@@ -259,6 +272,9 @@ class PolizaListItem(BaseModel):
     agente_nombre: str | None = None
     analista_id: UUID | None
     activo: bool
+    
+    prima_neta: Decimal | None = None
+    moneda: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -279,8 +295,43 @@ class PolizaResponse(BaseModel):
     datos_ramo: dict
     notas: str | None
     activo: bool
+    
+    prima_neta: Decimal | None = None
+    moneda: str | None = None
+    porcentaje_comision: Decimal | None = None
+    monto_comision: Decimal | None = None
+    
     created_at: datetime
     updated_at: datetime
     asegurados: list[PolizaAseguradoResponse] = []
 
     model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Ficha completa — historial unificado
+# ---------------------------------------------------------------------------
+
+
+class EventoFichaPoliza(BaseModel):
+    """
+    Un evento del historial unificado de una póliza.
+
+    Combina cronológicamente los eventos de TODOS los trámites de la póliza
+    (tabla tramite_evento — incluye activaciones GNP vía trigger) con los
+    movimientos de comisión/estorno (tabla comision_recibo) de la misma póliza.
+    """
+
+    fuente: str = Field(description="Origen del evento: 'tramite' | 'comision'.")
+    tipo: str = Field(
+        description="Subtipo del evento: tipo_evento del trámite, o 'comision'/'estorno'."
+    )
+    titulo: str
+    descripcion: str
+    fecha: datetime
+    actor: str | None = Field(
+        default=None, description="Nombre del usuario o agente IA que originó el evento."
+    )
+    tramite_id: UUID | None = None
+    tramite_folio: str | None = None
+    datos: dict = Field(default_factory=dict)

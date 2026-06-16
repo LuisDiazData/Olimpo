@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from core.config import get_settings
-from routers import auth, licencias, stats, tenants, usuarios_maestros
+from routers import auth, licencias, stats, tenants, usuarios_maestros, observabilidad
 
 log = structlog.get_logger(__name__)
 
@@ -139,6 +139,7 @@ def create_app() -> FastAPI:
     app.include_router(usuarios_maestros.router, prefix="/api/v1")
     app.include_router(licencias.router, prefix="/api/v1")
     app.include_router(stats.router, prefix="/api/v1")
+    app.include_router(observabilidad.router, prefix="/api/v1")
 
     return app
 

@@ -47,21 +47,23 @@ def registrar_correo(
     """
     db = get_db()
 
-    # Idempotencia: verificar si ya existe
+    # Idempotencia: verificar si ya existe (la columna real es message_id).
     existing = db.table("correo").select("id").eq(
-        "gmail_message_id", gmail_message_id
+        "message_id", gmail_message_id
     ).maybe_single().execute()
 
     if existing.data:
         return {"correo_id": existing.data["id"], "ya_existia": True}
 
+    # Nombres de columna según el esquema real de la tabla correo (módulo 05):
+    # message_id, thread_id, de_email, de_nombre, fecha_correo.
     payload: dict[str, Any] = {
-        "gmail_message_id": gmail_message_id,
-        "gmail_thread_id": gmail_thread_id,
-        "remitente_email": remitente_email,
-        "remitente_nombre": remitente_nombre,
+        "message_id": gmail_message_id,
+        "thread_id": gmail_thread_id,
+        "de_email": remitente_email,
+        "de_nombre": remitente_nombre,
         "asunto": asunto,
-        "fecha_recibido": fecha_recibido,
+        "fecha_correo": fecha_recibido,
         "tipo": "entrante",
         "estado": "recibido",
     }
@@ -200,11 +202,9 @@ def actualizar_estado_correo(
     Returns: {"ok": true}
     """
     db = get_db()
-    payload: dict[str, Any] = {"estado": estado}
-    if error_detalle:
-        payload["error_detalle"] = error_detalle
-
-    db.table("correo").update(payload).eq("id", correo_id).execute()
+    # La tabla correo no tiene columna error_detalle; el detalle solo se registra
+    # en logs/eventos. Solo persistimos el estado.
+    db.table("correo").update({"estado": estado}).eq("id", correo_id).execute()
     return {"ok": True}
 
 

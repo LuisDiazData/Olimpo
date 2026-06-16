@@ -293,9 +293,9 @@ CREATE TRIGGER trg_auth_on_new_usuario
     FOR EACH ROW
     EXECUTE FUNCTION sync_auth_usuario();
 
-COMMENT ON TRIGGER trg_auth_on_new_usuario ON auth.users IS
-    'Sincroniza auth.users → public.usuario en cada creación de usuario. '
-    'Garantiza que nunca exista un usuario de Auth sin perfil en el CRM.';
+-- COMMENT ON TRIGGER trg_auth_on_new_usuario ON auth.users IS
+--     'Sincroniza auth.users → public.usuario en cada creación de usuario. '
+--     'Garantiza que nunca exista un usuario de Auth sin perfil en el CRM.';
 
 
 -- -----------------------------------------------------------------------------
@@ -334,8 +334,8 @@ CREATE TRIGGER trg_auth_on_update_email
     FOR EACH ROW
     EXECUTE FUNCTION sync_auth_usuario_email();
 
-COMMENT ON TRIGGER trg_auth_on_update_email ON auth.users IS
-    'Propaga cambios de email desde auth.users hacia public.usuario.';
+-- COMMENT ON TRIGGER trg_auth_on_update_email ON auth.users IS
+--     'Propaga cambios de email desde auth.users hacia public.usuario.';
 
 
 -- =============================================================================

@@ -221,6 +221,47 @@ class AgregarNotaBody(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class SlaSemaforo(BaseModel):
+    """Estado del SLA del trámite con campos calculados (vista sla_tramite_vista)."""
+
+    estado: str = Field(description="Estado del SLA: en_curso | cumplido | incumplido | pausado.")
+    estado_semaforo: str = Field(
+        description="Semáforo calculado: verde | amarillo | rojo | pausado | cumplido."
+    )
+    vencido: bool = False
+    dias_restantes: Decimal | None = Field(
+        default=None, description="Días restantes (negativo si ya venció)."
+    )
+    porcentaje_consumido: Decimal | None = Field(
+        default=None, description="Porcentaje del plazo consumido (0-100), para barras de progreso."
+    )
+    fecha_inicio: datetime | None = None
+    fecha_limite: datetime | None = None
+    sla_nombre: str | None = None
+    dias_habiles_plazo: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class EstadoCatalogoItem(BaseModel):
+    """Metadatos de un estado de la máquina de estados (tabla cat_estado_tramite).
+
+    Sirve para que el frontend pinte badges/semáforos alineados a la DB en lugar
+    de hardcodear etiquetas y colores.
+    """
+
+    id: str
+    etiqueta: str
+    descripcion: str
+    es_terminal: bool
+    es_bloqueante: bool
+    color_hex: str
+    orden_ui: int
+    requiere_accion: bool
+
+    model_config = {"from_attributes": True}
+
+
 class TramiteListItem(BaseModel):
     """Vista compacta para dashboards y listados."""
 
@@ -297,6 +338,12 @@ class TramiteResponse(BaseModel):
     activo: bool
     created_at: datetime
     updated_at: datetime
+
+    # Metadatos del estado (cat_estado_tramite) y semáforo SLA — poblados en el router
+    estado_etiqueta: str | None = None
+    estado_color: str | None = None
+    estado_es_terminal: bool | None = None
+    sla: SlaSemaforo | None = None
 
     # Calculado en el router — no viene de la DB directamente
     transiciones_disponibles: list[str] = Field(

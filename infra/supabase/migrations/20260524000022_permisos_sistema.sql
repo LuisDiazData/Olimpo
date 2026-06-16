@@ -257,7 +257,7 @@ INSERT INTO rol_permiso (rol, permiso_id, concedido)
 SELECT r.rol, p.id, r.concedido
 FROM (VALUES
     -- tramites
-    ('director_general', 'tramites.ver',            TRUE),
+    ('director_general'::rol_usuario, 'tramites.ver',            TRUE),
     ('director_general', 'tramites.crear',           TRUE),
     ('director_general', 'tramites.editar',          TRUE),
     ('director_general', 'tramites.eliminar',        TRUE),
@@ -518,7 +518,7 @@ CREATE POLICY "usuario_permiso_select"
             AND EXISTS (
                 SELECT 1 FROM usuario u
                 WHERE u.id = usuario_permiso.usuario_id
-                  AND u.ramo = (auth.jwt() -> 'app_metadata' ->> 'ramo')
+                  AND u.ramo::text = (auth.jwt() -> 'app_metadata' ->> 'ramo')
             )
         )
     );
@@ -540,7 +540,7 @@ CREATE POLICY "permiso_audit_log_select"
                 (usuario_id IS NOT NULL AND EXISTS (
                     SELECT 1 FROM usuario u
                     WHERE u.id = permiso_audit_log.usuario_id
-                      AND u.ramo = (auth.jwt() -> 'app_metadata' ->> 'ramo')
+                      AND u.ramo::text = (auth.jwt() -> 'app_metadata' ->> 'ramo')
                 ))
             )
         )

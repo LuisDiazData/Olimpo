@@ -1,0 +1,92 @@
+
+> olimpo-web@0.1.0 dev
+> next dev --port 3000
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/luisdiaz/Documents/Proyectos/Olimpo/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Users/luisdiaz/Documents/Proyectos/Olimpo/apps/web/package-lock.json
+
+   ▲ Next.js 15.5.19
+   - Local:        http://localhost:3000
+   - Network:      http://10.10.1.225:3000
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1898ms
+ ✓ Compiled /middleware in 445ms (168 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (101kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (231kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 3.9s (863 modules)
+ GET /login?redirectTo=%2F 200 in 4541ms
+ ○ Compiling /api/auth/me ...
+ ✓ Compiled /api/auth/me in 812ms (883 modules)
+ GET /api/auth/me 401 in 996ms
+ GET /login?redirectTo=%2F 200 in 74ms
+ GET /login?redirectTo=%2F 200 in 181ms
+ GET /api/auth/me 401 in 45ms
+ GET /login?redirectTo=%2F 200 in 114ms
+ GET /api/auth/me 401 in 28ms
+ ✓ Compiled /api/auth/login in 339ms (871 modules)
+ POST /api/auth/login 401 in 891ms
+ POST /api/auth/login 401 in 77ms
+ POST /api/auth/login 200 in 210ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /api/auth/me 200 in 300ms
+ ✓ Compiled / in 472ms (881 modules)
+ GET / 200 in 689ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 2.8s (1964 modules)
+ GET /dashboard 200 in 432ms
+ GET /dashboard 200 in 3588ms
+ ○ Compiling /tramites ...
+ ✓ Compiled /tramites in 1350ms (2134 modules)
+ GET /tramites 200 in 1827ms
+ GET /tramites 200 in 71ms
+ ○ Compiling /agentes ...
+ ✓ Compiled /agentes in 641ms (2173 modules)
+ GET /agentes 200 in 813ms
+ ✓ Compiled /api/fwd in 405ms (2175 modules)
+ POST /api/fwd 200 in 1344ms
+ POST /api/fwd 200 in 1348ms
+ ○ Compiling /asignaciones ...
+ ✓ Compiled /asignaciones in 526ms (2198 modules)
+ GET /asignaciones 200 in 667ms
+ GET /asignaciones 200 in 35ms
+ POST /api/fwd 200 in 75ms
+ POST /api/fwd 200 in 87ms
+ ✓ Compiled /_not-found in 473ms (2203 modules)
+ GET /notificaciones 404 in 624ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /notificaciones 404 in 355ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /api/auth/me 200 in 103ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /asignaciones 200 in 202ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /api/fwd 200 in 105ms
+ POST /api/fwd 200 in 123ms
+ POST /api/fwd 200 in 143ms
+ GET /api/auth/me 200 in 158ms
+ ○ Compiling /usuarios ...
+ ✓ Compiled /usuarios in 556ms (2220 modules)
+ GET /usuarios 200 in 670ms
+ POST /api/fwd 200 in 99ms
+ POST /api/fwd 200 in 151ms
+ GET /configuracion 404 in 40ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /configuracion 404 in 199ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /api/auth/me 200 in 52ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /usuarios 200 in 247ms
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /api/auth/me 200 in 71ms
+ POST /api/fwd 200 in 59ms
+ POST /api/fwd 200 in 62ms
+ POST /api/fwd 200 in 1163ms
+ POST /api/fwd 200 in 1077ms
+[?25h

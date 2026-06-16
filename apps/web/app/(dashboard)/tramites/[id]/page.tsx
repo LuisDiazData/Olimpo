@@ -58,7 +58,26 @@ async function fetchTramiteDetalle(id: string): Promise<TramiteDetalle | null> {
     correo_origen_nombre = c.de_nombre ?? null
   }
 
-  const fechaLimite = (row.fecha_limite_sla as string | null) ?? null
+  // Semáforo SLA — datos calculados (vista sla_tramite_vista)
+  const { data: slaRow } = await supabase
+    .from("sla_tramite_vista")
+    .select("estado, estado_semaforo, dias_restantes, porcentaje_consumido, fecha_limite")
+    .eq("tramite_id", id)
+    .maybeSingle()
+
+  const slaSemaforo = (slaRow?.estado_semaforo as string | null) ?? null
+  const fechaLimite =
+    (slaRow?.fecha_limite as string | null) ?? (row.fecha_limite_sla as string | null) ?? null
+
+  // riesgo_sla deriva del semáforo de la DB cuando existe; si no, del cálculo local
+  const riesgo: TramiteDetalle["riesgo_sla"] =
+    slaSemaforo === "rojo"
+      ? "rojo"
+      : slaSemaforo === "amarillo"
+        ? "amarillo"
+        : slaSemaforo === "verde"
+          ? "verde"
+          : riesgoSla(fechaLimite)
 
   return {
     id: row.id as string,
@@ -98,8 +117,12 @@ async function fetchTramiteDetalle(id: string): Promise<TramiteDetalle | null> {
     asegurado_nombre: asegurado.nombre ?? null,
     correo_origen_email,
     correo_origen_nombre,
-    sla_estado: null,
-    riesgo_sla: riesgoSla(fechaLimite),
+    sla_estado: (slaRow?.estado as string | null) ?? null,
+    riesgo_sla: riesgo,
+    sla_semaforo: slaSemaforo,
+    sla_dias_restantes: slaRow?.dias_restantes != null ? Number(slaRow.dias_restantes) : null,
+    sla_porcentaje_consumido:
+      slaRow?.porcentaje_consumido != null ? Number(slaRow.porcentaje_consumido) : null,
     transiciones_disponibles: [],
   } satisfies TramiteDetalle
 }

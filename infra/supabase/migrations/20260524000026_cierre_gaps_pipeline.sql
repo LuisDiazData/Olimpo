@@ -85,7 +85,7 @@ COMMENT ON INDEX idx_correo_sin_eml_storage IS
 -- Índice para recuperar ruta por correo_id (el Agente 6 necesita el .eml
 -- al construir las respuestas con forward correcto de headers)
 CREATE INDEX IF NOT EXISTS idx_correo_eml_path
-    ON correo (correo_id)
+    ON correo (id)
     WHERE eml_storage_path IS NOT NULL;
 
 -- ^^^ self-referencing path index — usar por id directamente es O(1) via PK,

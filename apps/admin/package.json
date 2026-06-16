@@ -1,0 +1,8 @@
+{
+  "name": "olimpo-admin-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "source ../api/.venv/bin/activate && uvicorn main:app --reload --port 8001"
+  }
+}

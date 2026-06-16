@@ -256,12 +256,11 @@ AS $$
         a.id,
         a.nombre,
         a.cua,
-        a.email,
-        a.ramo::text,
+        (SELECT email FROM agente_email ae WHERE ae.agente_id = a.id AND ae.preferente = TRUE LIMIT 1) AS email,
+        NULL::text AS ramo,
         similarity(a.nombre, p_nombre) AS similitud_trgm
     FROM agente a
     WHERE a.activo = p_activo
-      AND (p_ramo IS NULL OR a.ramo::text = p_ramo)
       AND similarity(a.nombre, p_nombre) >= p_umbral_trgm
     ORDER BY similarity(a.nombre, p_nombre) DESC
     LIMIT p_limite;

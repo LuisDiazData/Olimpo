@@ -27,9 +27,11 @@ from models.tramite import (
     AsignarAnalistaBody,
     CambiarEstadoBody,
     ContactoTramiteResponse,
+    EstadoCatalogoItem,
     EstadoTramite,
     EventoResponse,
     ReasignacionMasivaBody,
+    SlaSemaforo,
     TipoEventoTramite,
     TramiteCreate,
     TramiteListItem,
@@ -237,12 +239,45 @@ async def crear_tramite(
         )
         .execute()
     )
-    if result.data:
-        result.data = result.data[0]
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo crear el trámite.",
+        )
+    result.data = result.data[0]
 
     data = _enriquecer_tramite(result.data)
     log.info("tramite_creado", folio=data["folio"], tipo=body.tipo_tramite, por=str(usuario.id))
     return TramiteResponse.model_validate(data)
+
+
+# ---------------------------------------------------------------------------
+# GET /tramites/catalogo/estados
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/catalogo/estados",
+    response_model=list[EstadoCatalogoItem],
+    summary="Catálogo de estados del trámite",
+    description=(
+        "Devuelve los estados de la máquina de estados con sus metadatos "
+        "(etiqueta, color, es_terminal, es_bloqueante, requiere_accion, orden_ui). "
+        "El frontend lo usa para pintar badges y semáforos alineados a la DB en lugar "
+        "de hardcodear etiquetas y colores. Ordenado por orden_ui."
+    ),
+)
+async def listar_catalogo_estados(
+    usuario: UsuarioToken = Depends(get_current_user),
+) -> list[EstadoCatalogoItem]:
+    db = get_user_db(usuario.access_token)
+    result = (
+        db.table("cat_estado_tramite")
+        .select("id, etiqueta, descripcion, es_terminal, es_bloqueante, color_hex, orden_ui, requiere_accion")
+        .order("orden_ui", desc=False)
+        .execute()
+    )
+    return [EstadoCatalogoItem.model_validate(row) for row in result.data]
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +343,33 @@ async def obtener_tramite(
     else:
         data["correo_origen_email"] = None
         data["correo_origen_nombre"] = None
+
+    # Metadatos del estado actual (cat_estado_tramite) para badges/semáforo en la UI
+    estado_meta = (
+        db.table("cat_estado_tramite")
+        .select("etiqueta, color_hex, es_terminal")
+        .eq("id", data.get("estado", ""))
+        .maybe_single()
+        .execute()
+    )
+    if estado_meta and estado_meta.data:
+        data["estado_etiqueta"] = estado_meta.data.get("etiqueta")
+        data["estado_color"] = estado_meta.data.get("color_hex")
+        data["estado_es_terminal"] = estado_meta.data.get("es_terminal")
+
+    # Semáforo SLA (vista sla_tramite_vista) — None si el trámite aún no tiene SLA activo
+    sla_row = (
+        db.table("sla_tramite_vista")
+        .select(
+            "estado, estado_semaforo, vencido, dias_restantes, porcentaje_consumido, "
+            "fecha_inicio, fecha_limite, sla_nombre, dias_habiles_plazo"
+        )
+        .eq("tramite_id", str(tramite_id))
+        .maybe_single()
+        .execute()
+    )
+    if sla_row and sla_row.data:
+        data["sla"] = SlaSemaforo.model_validate(sla_row.data)
 
     return TramiteResponse.model_validate(data)
 
@@ -419,9 +481,14 @@ async def cambiar_estado(
         actualizaciones["folio_ot"] = body.folio_ot
 
     if body.estado_nuevo == EstadoTramite.turnado_a_gnp:
-        from datetime import date
+        # Solo registramos la fecha de envío de OT si hay folio_ot disponible
+        # (del body o ya guardado): el CHECK ck_tramite_ot_envio exige que
+        # ot_fecha_envio sea NULL mientras folio_ot sea NULL.
+        folio_ot_efectivo = body.folio_ot or tramite.get("folio_ot")
+        if folio_ot_efectivo:
+            from datetime import date
 
-        actualizaciones["ot_fecha_envio"] = date.today().isoformat()
+            actualizaciones["ot_fecha_envio"] = date.today().isoformat()
 
     if body.estado_nuevo in (EstadoTramite.completado, EstadoTramite.rechazado_gnp):
         from datetime import date
@@ -781,10 +848,12 @@ async def agregar_nota(
         )
         .execute()
     )
-    if result.data:
-        result.data = result.data[0]
-
-    data = result.data
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo registrar la nota.",
+        )
+    data = result.data[0]
     data["usuario_nombre"] = None
 
     return EventoResponse.model_validate(data)

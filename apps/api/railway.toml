@@ -3,6 +3,13 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+# NOTA SOBRE ESCALABILIDAD HORIZONTAL:
+# Railway escala verticalmente (CPU/RAM) de manera automática. Para escalar HORIZONTALMENTE (réplicas):
+# 1. Ve al Dashboard de Railway > Settings > Deployments.
+# 2. Configura el Auto-scaling basado en CPU/Memory (ej. escalar al 80%).
+# 3. Considera el límite matemático de Supabase PostgREST:
+#    Total Conexiones HTTP = Réplicas * Workers * SUPABASE_MAX_CONNECTIONS
+#    (Ej: 3 réplicas * 4 workers * 100 = 1200 conexiones).
 startCommand = "sh -c 'uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2'"
 healthcheckPath = "/health"
 healthcheckTimeout = 60

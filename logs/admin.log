@@ -1,0 +1,49 @@
+INFO:     Will watch for changes in these directories: ['/Users/luisdiaz/Documents/Proyectos/Olimpo/apps/admin']
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [2686] using WatchFiles
+INFO:     Started server process [2701]
+INFO:     Waiting for application startup.
+2026-06-15 19:28:32 [info     ] olimpo_admin_arrancando        environment=development
+INFO:     Application startup complete.
+INFO:     127.0.0.1:56143 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56144 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56146 - "OPTIONS /api/v1/observabilidad/metricas HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56148 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56150 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56153 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56154 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     127.0.0.1:56162 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56164 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56167 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56169 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56170 - "OPTIONS /api/v1/observabilidad/metricas HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56172 - "GET /api/v1/observabilidad/feed HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56176 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56177 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56181 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56182 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56184 - "GET /api/v1/observabilidad/estado-actual HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56187 - "GET /api/v1/observabilidad/metricas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56189 - "GET /api/v1/observabilidad/feed HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56192 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56194 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56195 - "OPTIONS /api/v1/observabilidad/metricas HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56199 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56200 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56203 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56204 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56207 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56209 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56210 - "OPTIONS /api/v1/observabilidad/metricas HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56213 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56214 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56217 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56218 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56223 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56226 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56227 - "OPTIONS /api/v1/observabilidad/metricas HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56240 - "OPTIONS /api/v1/observabilidad/estado-actual HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:56241 - "OPTIONS /api/v1/observabilidad/feed HTTP/1.1" 405 Method Not Allowed

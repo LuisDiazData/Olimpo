@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import type { User } from "@supabase/supabase-js"
 
 interface Usuario {
@@ -15,6 +15,7 @@ interface UserContextValue {
   user: User | null
   perfil: Usuario | null
   isLoading: boolean
+  refreshPerfil: () => Promise<void>
 }
 
 interface UserProviderProps {
@@ -27,36 +28,35 @@ const UserContext = createContext<UserContextValue>({
   user: null,
   perfil: null,
   isLoading: true,
+  refreshPerfil: async () => {},
 })
 
 export function UserProvider({ children, initialUser, initialPerfil }: UserProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser as User | null ?? null)
   const [perfil, setPerfil] = useState<Usuario | null>(initialPerfil ?? null)
-  // Si ya tenemos datos del server, no mostramos spinner inicial
   const [isLoading, setIsLoading] = useState(!initialPerfil)
 
-  useEffect(() => {
-    // Sólo hace la llamada si no tenemos nombre real (initialPerfil viene con nombre placeholder)
-    // o si no hay initialPerfil en absoluto. Carga en background sin afectar isLoading.
-    async function refresh() {
-      try {
-        const res = await fetch("/api/auth/me")
-        if (res.ok) {
-          const data = await res.json()
-          setUser(data.user)
-          setPerfil(data.perfil)
-        }
-      } catch {
-        // ignorar si falla el refresh
-      } finally {
-        setIsLoading(false)
+  const refreshPerfil = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/me")
+      if (res.ok) {
+        const data = await res.json()
+        setUser(data.user)
+        setPerfil(data.perfil)
       }
+    } catch {
+      // ignorar si falla el refresh
+    } finally {
+      setIsLoading(false)
     }
-    refresh()
   }, [])
 
+  useEffect(() => {
+    refreshPerfil()
+  }, [refreshPerfil])
+
   return (
-    <UserContext.Provider value={{ user, perfil, isLoading }}>
+    <UserContext.Provider value={{ user, perfil, isLoading, refreshPerfil }}>
       {children}
     </UserContext.Provider>
   )

@@ -2,12 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Building2, LayoutDashboard } from "lucide-react"
+import { Building2, LayoutDashboard, Activity } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/promotoras", label: "Promotorías", icon: Building2 },
+  { href: "/observabilidad", label: "Observabilidad IA", icon: Activity },
 ]
 
 export function Sidebar() {

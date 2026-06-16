@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  ScrollText,
   Bell,
   Settings,
   LogOut,
@@ -23,6 +24,7 @@ const NAV_BY_ROLE: Record<string, { href: string; label: string; icon: React.Ele
   director_general: [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/tramites", label: "Trámites", icon: FileText },
+    { href: "/polizas", label: "Pólizas", icon: ScrollText },
     { href: "/agentes", label: "Agentes", icon: Users },
     { href: "/asignaciones", label: "Asignaciones", icon: GitFork },
     { href: "/notificaciones", label: "Notificaciones", icon: Bell },
@@ -32,6 +34,7 @@ const NAV_BY_ROLE: Record<string, { href: string; label: string; icon: React.Ele
   director_ops: [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/tramites", label: "Trámites", icon: FileText },
+    { href: "/polizas", label: "Pólizas", icon: ScrollText },
     { href: "/agentes", label: "Agentes", icon: Users },
     { href: "/asignaciones", label: "Asignaciones", icon: GitFork },
     { href: "/notificaciones", label: "Notificaciones", icon: Bell },
@@ -41,6 +44,7 @@ const NAV_BY_ROLE: Record<string, { href: string; label: string; icon: React.Ele
   gerente: [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/tramites", label: "Trámites", icon: FileText },
+    { href: "/polizas", label: "Pólizas", icon: ScrollText },
     { href: "/agentes", label: "Agentes", icon: Users },
     { href: "/asignaciones", label: "Asignaciones", icon: GitFork },
     { href: "/notificaciones", label: "Notificaciones", icon: Bell },
@@ -48,6 +52,7 @@ const NAV_BY_ROLE: Record<string, { href: string; label: string; icon: React.Ele
   analista: [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/tramites", label: "Trámites", icon: FileText },
+    { href: "/polizas", label: "Pólizas", icon: ScrollText },
     { href: "/notificaciones", label: "Notificaciones", icon: Bell },
   ],
 }

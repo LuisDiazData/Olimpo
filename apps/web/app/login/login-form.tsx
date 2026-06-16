@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useUser } from "@/components/providers/user-provider"
 
 const loginSchema = z.object({
   email: z.string().email("Ingresa un email válido"),
@@ -22,6 +23,7 @@ type LoginInput = z.infer<typeof loginSchema>
 export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { refreshPerfil } = useUser()
   const [showPassword, setShowPassword] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -61,8 +63,10 @@ export default function LoginForm() {
       return
     }
 
+    // Actualizar perfil en contexto antes de navegar para evitar el flash de nav incorrecto.
+    // El UserProvider persiste en el root layout — useState no se reinicializa al navegar.
+    await refreshPerfil()
     router.push("/")
-    router.refresh()
   }
 
   return (

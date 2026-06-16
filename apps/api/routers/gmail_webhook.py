@@ -116,7 +116,7 @@ async def _encolar_procesamiento_correo(
                 "subscription": subscription,
                 "pubsub_message_id": message_id,
             },
-            queue="ingesta",
+            queue="procesamiento",
         )
         log.info(
             "correo_encolado_celery",
@@ -273,7 +273,7 @@ async def renovar_canal_gmail(
         celery_app.send_task(
             "agentes.gmail_worker.renovar_canal_pubsub",
             kwargs={"email_address": email_address},
-            queue="ingesta",
+            queue="procesamiento",
         )
     except Exception as exc:
         log.error("error_encolar_renovacion", email_address=email_address, error=str(exc))

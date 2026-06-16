@@ -184,8 +184,8 @@ def descargar_template():
     )
 
     headers = [
-        "CUA *",
-        "Nombre completo *",
+        "CUA",
+        "Nombre completo",
         "Nombre comercial",
         "RFC",
         "Fecha de afiliación (YYYY-MM-DD)",

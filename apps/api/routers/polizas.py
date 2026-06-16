@@ -24,6 +24,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from core.auth import get_current_user, require_roles
 from core.busqueda import filtro_busqueda_or
 from core.database import get_admin_db_dep, get_user_db
+from models.comision import ReciboComisionResponse
+from models.correo import DocumentoListItem
 from models.poliza import (
     AseguradoBuscarOCrearBody,
     AseguradoBuscarOCrearResponse,
@@ -32,6 +34,7 @@ from models.poliza import (
     AseguradoResponse,
     AseguradoUpdate,
     CandidatoAsegurado,
+    EventoFichaPoliza,
     PolizaAseguradoCreate,
     PolizaAseguradoResponse,
     PolizaCreate,
@@ -39,6 +42,7 @@ from models.poliza import (
     PolizaResponse,
     PolizaUpdate,
 )
+from models.tramite import TramiteListItem
 from models.usuario import RolUsuario, UsuarioToken
 
 log = structlog.get_logger(__name__)
@@ -348,7 +352,7 @@ async def obtener_poliza(
             "*, agente!left(nombre, cua), "
             "usuario!poliza_analista_id_fkey!left(nombre), "
             "poliza_asegurado(id, poliza_id, asegurado_id, rol, parentesco, porcentaje, datos_adicionales, created_at, "
-            "asegurado!left(nombre))"
+            "asegurado!left(nombre, rfc))"
         )
         .eq("id", str(poliza_id))
         .maybe_single()
@@ -462,6 +466,246 @@ async def desvincular_asegurado(
     log.info("asegurado_desvinculado", vinculo_id=str(vinculo_id), por=str(usuario.id))
 
 
+# ===========================================================================
+# FICHA DE PÓLIZA — sub-recursos agregados
+# ===========================================================================
+# La "ficha completa" se ensambla en la API a partir de tablas existentes.
+# Cada endpoint confirma primero la visibilidad de la póliza con
+# _get_poliza_o_404() usando el cliente RLS del usuario (db). Esto actúa como
+# control de acceso para las tablas de comisiones, cuyo RLS es laxo
+# (auth.role()='authenticated'): si el usuario no puede ver la póliza, recibe 404.
+# ===========================================================================
+
+# Títulos legibles por tipo de evento del trámite para el historial de la póliza
+_TITULO_EVENTO_TRAMITE: dict[str, str] = {
+    "creacion": "Trámite creado",
+    "cambio_estado": "Cambio de estado",
+    "asignacion": "Asignación",
+    "reasignacion": "Reasignación",
+    "nota_analista": "Nota del analista",
+    "documento_agregado": "Documento agregado",
+    "correo_recibido": "Correo recibido",
+    "correo_enviado": "Correo enviado",
+    "accion_agente_ia": "Acción de agente IA",
+    "activacion_gnp": "Activación GNP",
+    "solicitud_documentos": "Solicitud de documentos",
+    "rechazo_gnp": "Rechazo de GNP",
+    "aprendizaje_rag": "Aprendizaje RAG",
+}
+
+
+def _flatten_tramite_list_row(row: dict) -> dict:
+    """Aplana los JOINs de agente/analista en campos planos de TramiteListItem."""
+    agente = row.pop("agente", None) or {}
+    row["agente_nombre"] = agente.get("nombre")
+    row["agente_cua"] = agente.get("cua")
+    analista = row.pop("usuario", None) or {}
+    row["analista_nombre"] = analista.get("nombre")
+    return row
+
+
+@router.get(
+    "/polizas/{poliza_id}/tramites",
+    response_model=list[TramiteListItem],
+    summary="Trámites de la póliza",
+    description=(
+        "Devuelve los trámites vinculados a la póliza (tramite.poliza_id). "
+        "La RLS aplica por rol: un analista solo ve los trámites que tiene asignados."
+    ),
+)
+async def listar_tramites_poliza(
+    poliza_id: UUID,
+    usuario: UsuarioToken = Depends(get_current_user),
+) -> list[TramiteListItem]:
+    db = get_user_db(usuario.access_token)
+    _get_poliza_o_404(db, poliza_id)
+
+    result = (
+        db.table("tramite")
+        .select(
+            "id, folio, folio_ot, tipo_tramite, estado, prioridad, ramo, titulo, "
+            "requiere_atencion, analista_id, agente_id, fecha_recepcion, "
+            "fecha_limite_sla, ultima_actividad, etiquetas, "
+            "agente!left(nombre, cua), usuario!tramite_analista_id_fkey!left(nombre)"
+        )
+        .eq("poliza_id", str(poliza_id))
+        .eq("activo", True)
+        .order("ultima_actividad", desc=True)
+        .execute()
+    )
+    return [TramiteListItem.model_validate(_flatten_tramite_list_row(r)) for r in result.data]
+
+
+@router.get(
+    "/polizas/{poliza_id}/comisiones",
+    response_model=list[ReciboComisionResponse],
+    summary="Recibos de comisión de la póliza",
+    description=(
+        "Devuelve los recibos de comisión vinculados a la póliza (comision_recibo.poliza_id), "
+        "incluyendo estornos. Requiere que el usuario pueda ver la póliza."
+    ),
+)
+async def listar_comisiones_poliza(
+    poliza_id: UUID,
+    usuario: UsuarioToken = Depends(get_current_user),
+) -> list[ReciboComisionResponse]:
+    db = get_user_db(usuario.access_token)
+    _get_poliza_o_404(db, poliza_id)  # gate de acceso (RLS sobre poliza)
+
+    result = (
+        db.table("comision_recibo")
+        .select("*")
+        .eq("poliza_id", str(poliza_id))
+        .order("creado_en", desc=True)
+        .execute()
+    )
+    return [ReciboComisionResponse.model_validate(r) for r in result.data]
+
+
+@router.get(
+    "/polizas/{poliza_id}/documentos",
+    response_model=list[DocumentoListItem],
+    summary="Documentos de la póliza",
+    description=(
+        "Devuelve los documentos de todos los trámites de la póliza "
+        "(documento.tramite_id → tramite.poliza_id). La RLS de trámites/documentos "
+        "limita la visibilidad por rol."
+    ),
+)
+async def listar_documentos_poliza(
+    poliza_id: UUID,
+    usuario: UsuarioToken = Depends(get_current_user),
+) -> list[DocumentoListItem]:
+    db = get_user_db(usuario.access_token)
+    _get_poliza_o_404(db, poliza_id)
+
+    tramites = db.table("tramite").select("id").eq("poliza_id", str(poliza_id)).execute()
+    tramite_ids = [t["id"] for t in (tramites.data or [])]
+    if not tramite_ids:
+        return []
+
+    result = (
+        db.table("documento")
+        .select(
+            "id, adjunto_id, tramite_id, tipo_documento, "
+            "confianza_clasificacion, confianza_ocr, modelo_ocr, intentos_ocr, "
+            "vigente_hasta, estado_validacion, motivo_invalidez, "
+            "created_at, updated_at, adjunto!inner(nombre_archivo)"
+        )
+        .in_("tramite_id", tramite_ids)
+        .order("created_at", desc=False)
+        .execute()
+    )
+
+    documentos = []
+    for row in result.data:
+        adjunto = row.pop("adjunto", None) or {}
+        row["adjunto_nombre"] = adjunto.get("nombre_archivo")
+        documentos.append(DocumentoListItem.model_validate(row))
+    return documentos
+
+
+@router.get(
+    "/polizas/{poliza_id}/historial",
+    response_model=list[EventoFichaPoliza],
+    summary="Historial unificado de la póliza",
+    description=(
+        "Timeline cronológico de la póliza: eventos de TODOS sus trámites "
+        "(tabla tramite_evento — incluye activaciones GNP) combinados con los "
+        "movimientos de comisión/estorno de la póliza. Ordenado por fecha descendente."
+    ),
+)
+async def historial_poliza(
+    poliza_id: UUID,
+    limit: int = Query(default=200, ge=1, le=500),
+    usuario: UsuarioToken = Depends(get_current_user),
+) -> list[EventoFichaPoliza]:
+    db = get_user_db(usuario.access_token)
+    _get_poliza_o_404(db, poliza_id)
+
+    # 1. Trámites de la póliza (RLS por rol) → mapa id→folio
+    tramites = db.table("tramite").select("id, folio").eq("poliza_id", str(poliza_id)).execute()
+    folio_por_id: dict[str, str | None] = {
+        t["id"]: t.get("folio") for t in (tramites.data or [])
+    }
+    tramite_ids = list(folio_por_id.keys())
+
+    eventos: list[EventoFichaPoliza] = []
+
+    # 2. Eventos del timeline de los trámites (incluye activaciones GNP vía trigger)
+    if tramite_ids:
+        ev = (
+            db.table("tramite_evento")
+            .select(
+                "tramite_id, tipo_evento, descripcion, usuario_id, agente_ia_nombre, "
+                "datos, created_at, usuario!tramite_evento_usuario_id_fkey!left(nombre)"
+            )
+            .in_("tramite_id", tramite_ids)
+            .eq("visible_en_timeline", True)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        for row in ev.data:
+            u = row.pop("usuario", None) or {}
+            tipo = row.get("tipo_evento") or "evento"
+            eventos.append(
+                EventoFichaPoliza(
+                    fuente="tramite",
+                    tipo=tipo,
+                    titulo=_TITULO_EVENTO_TRAMITE.get(tipo, "Evento"),
+                    descripcion=row.get("descripcion") or "",
+                    fecha=row.get("created_at"),
+                    actor=u.get("nombre") or row.get("agente_ia_nombre"),
+                    tramite_id=row.get("tramite_id"),
+                    tramite_folio=folio_por_id.get(row.get("tramite_id")),
+                    datos=row.get("datos") or {},
+                )
+            )
+
+    # 3. Movimientos de comisión de la póliza
+    recibos = (
+        db.table("comision_recibo")
+        .select("*")
+        .eq("poliza_id", str(poliza_id))
+        .order("creado_en", desc=True)
+        .execute()
+    )
+    for r in recibos.data or []:
+        es_estorno = bool(r.get("es_estorno"))
+        moneda = r.get("moneda") or "MXN"
+        monto = r.get("comision_total")
+        descripcion = (
+            f"{'Estorno' if es_estorno else 'Comisión'} de {monto} {moneda} "
+            f"· Póliza {r.get('numero_poliza_texto')}"
+        )
+        if r.get("numero_recibo"):
+            descripcion += f" · Recibo {r['numero_recibo']}"
+        eventos.append(
+            EventoFichaPoliza(
+                fuente="comision",
+                tipo="estorno" if es_estorno else "comision",
+                titulo="Estorno de comisión" if es_estorno else "Comisión registrada",
+                descripcion=descripcion,
+                fecha=r.get("creado_en"),
+                actor=None,
+                datos={
+                    "comision_total": monto,
+                    "comision_agente": r.get("comision_agente"),
+                    "comision_promotoria": r.get("comision_promotoria"),
+                    "prima_pagada": r.get("prima_pagada"),
+                    "fecha_pago": r.get("fecha_pago"),
+                    "moneda": moneda,
+                    "es_estorno": es_estorno,
+                },
+            )
+        )
+
+    # 4. Fusionar cronológicamente (descendente) y limitar
+    eventos.sort(key=lambda e: e.fecha, reverse=True)
+    return eventos[:limit]
+
+
 # ---------------------------------------------------------------------------
 # Helper de construcciÃ³n de PolizaResponse
 # ---------------------------------------------------------------------------
@@ -480,6 +724,7 @@ def _armar_poliza_response(data: dict) -> PolizaResponse:
     for v in vinculos_raw:
         asegurado = v.pop("asegurado", None) or {}
         v["asegurado_nombre"] = asegurado.get("nombre")
+        v["asegurado_rfc"] = asegurado.get("rfc")
         vinculos.append(PolizaAseguradoResponse.model_validate(v))
 
     data["asegurados"] = vinculos

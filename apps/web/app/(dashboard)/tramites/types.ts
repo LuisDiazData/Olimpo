@@ -54,6 +54,11 @@ export interface TramiteDetalle extends TramiteRow {
   activo: boolean
   created_at: string
   updated_at: string
+
+  // Semáforo SLA (vista sla_tramite_vista) — null si el trámite aún no tiene SLA activo
+  sla_semaforo: string | null
+  sla_dias_restantes: number | null
+  sla_porcentaje_consumido: number | null
 }
 
 /** Evento individual del timeline del trámite */

@@ -21,6 +21,7 @@ from routers import (
     agentes,
     asignaciones,
     coberturas,
+    comisiones,
     comunicaciones,
     correos,
     gmail_webhook,
@@ -33,6 +34,10 @@ from routers import (
     test_ia,
     tramites,
     usuarios,
+    prospectos,
+    bi,
+    campanas,
+    observabilidad,
 )
 
 log = structlog.get_logger(__name__)
@@ -111,6 +116,11 @@ def create_app() -> FastAPI:
     app.include_router(pipeline.router, prefix="/api/v1")
     app.include_router(permisos.router, prefix="/api/v1")
     app.include_router(test_ia.router, prefix="/api/v1")
+    app.include_router(prospectos.router, prefix="/api/v1")
+    app.include_router(bi.router, prefix="/api/v1")
+    app.include_router(campanas.router, prefix="/api/v1")
+    app.include_router(observabilidad.router, prefix="/api/v1")
+    app.include_router(comisiones.router, prefix="/api/v1")
 
     return app
 

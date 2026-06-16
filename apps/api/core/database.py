@@ -18,9 +18,14 @@ from core.auth import get_current_user
 from core.config import get_settings
 from models.usuario import UsuarioToken
 
+_settings = get_settings()
+
 # Cliente HTTP compartido con pooling para evitar agotamiento de sockets bajo carga
 _shared_http_client = httpx.Client(
-    limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+    limits=httpx.Limits(
+        max_connections=_settings.SUPABASE_MAX_CONNECTIONS,
+        max_keepalive_connections=_settings.SUPABASE_KEEPALIVE_CONNECTIONS
+    ),
     timeout=30.0,
 )
 
